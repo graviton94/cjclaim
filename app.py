@@ -41,7 +41,7 @@ from src.io_utils import load_min_csv
 from src.preprocess import weekly_agg_from_counts, GROUP_COLS
 from src.cycle_features import compute_psi, amplitude, find_peaks_basic
 from src.changepoint import detect_changepoints
-from src.forecasting import fit_forecast
+from src.forecasting import fit_forecast, safe_forecast
 from src.scoring import early_warning_rule
 
 st.set_page_config(page_title="CJ Claim – MVP", layout="wide")
@@ -52,7 +52,9 @@ if not file:
     st.stop()
 
 df = load_min_csv(file)
-agg = weekly_agg_from_counts(df)
+# 2024년 12월까지 빈 주차를 0으로 채우기
+cutoff_date = pd.Timestamp('2024-12-31')
+agg = weekly_agg_from_counts(df, pad_to_date=cutoff_date)
 
 # 필터링을 위한 함수
 def get_filtered_options(df, plant=None, category=None):
@@ -61,7 +63,7 @@ def get_filtered_options(df, plant=None, category=None):
 
 # 예측 성능이 좋은 조합 계산
 @st.cache_data
-def calculate_combination_scores(data: pd.DataFrame) -> pd.DataFrame:
+def calculate_combination_scores(data: pd.DataFrame, ci: float = 0.99) -> pd.DataFrame:
     """각 조합별 예측 성능 계산
 
     반환 컬럼: 플랜트, 제품범주2, 중분류, reliability_score, mae_score, rmse_score,
@@ -74,17 +76,20 @@ def calculate_combination_scores(data: pd.DataFrame) -> pd.DataFrame:
         group_sorted = group.sort_values('week')
         if len(group_sorted) < 26:
             continue
-
-        y = group_sorted['y'].values
-        # train: all but last 26, test: last 26
-        train_size = max(1, len(y) - 26)
-        if train_size < 1:
+            
+        # 2024년 12월까지의 데이터를 학습에 사용
+        cutoff = pd.Timestamp('2024-12-31')
+        train_mask = group_sorted['week'] <= cutoff
+        test_mask = group_sorted['week'] > cutoff
+        
+        if not train_mask.any():
             continue
-        y_train = y[:train_size]
-        y_test = y[train_size:]
-
+            
+        y_train = group_sorted[train_mask]['y'].values
+        y_test = group_sorted[test_mask]['y'].values if test_mask.any() else np.array([])
+        
         try:
-            fc = fit_forecast(pd.Series(y_train), horizon=26)
+            fc = safe_forecast(pd.Series(y_train), horizon=26, seasonal_order=(0,1,1,52), ci=ci)
         except Exception:
             # if forecasting fails, skip this group
             continue
@@ -121,61 +126,76 @@ def calculate_combination_scores(data: pd.DataFrame) -> pd.DataFrame:
 
     return pd.DataFrame(scores)
 
+# 신뢰수준 선택 (신뢰구간)
+ci_choice = st.selectbox("신뢰구간 선택", ["95%", "99%"], index=1, help="예측 신뢰구간 수준을 선택하세요. 품질관리에서 더 보수적인 99%를 권장합니다.")
+ci = 0.99 if ci_choice == "99%" else 0.95
+
 # 신뢰도 점수 계산
-combination_scores = calculate_combination_scores(agg)
+combination_scores = calculate_combination_scores(agg, ci)
 
-# 필터 컨트롤
-st.write("### 데이터 필터")
-c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
-
-# 신뢰도 점수 필터
-min_reliability = c4.slider(
+# 1) 최소 신뢰도 점수 선택 (맨 위)
+st.write("### 신뢰도 기반 조합 필터")
+min_reliability = st.slider(
     "최소 신뢰도 점수",
     min_value=0,
     max_value=100,
     value=50,
-    help="예측 신뢰도 점수가 이 값 이상인 조합만 표시됩니다. "
-         "점수는 MAPE, R-squared, 신뢰구간 너비를 종합적으로 고려하여 계산됩니다."
+    help="이 값 이상인 조합만 아래 목록에 표시됩니다. 기본값 50"
 )
 
-# 신뢰도 기준을 만족하는 조합만 필터링
-reliable_combinations = combination_scores[
-    combination_scores['reliability_score'] >= min_reliability
-]
+# 2) 조건을 만족하는 조합들을 점수 순으로 테이블로 보여주기
+reliable_combinations = combination_scores[combination_scores['reliability_score'] >= min_reliability]
+reliable_combinations_sorted = reliable_combinations.sort_values('reliability_score', ascending=False)
 
-# 플랜트 선택
-available_plants = ["(ALL)"] + sorted(reliable_combinations["플랜트"].unique().tolist())
-f1 = c1.selectbox("플랜트", available_plants, 0)
+st.write(f"### 조건을 만족하는 조합 (총 {len(reliable_combinations_sorted)}개)")
+if reliable_combinations_sorted.empty:
+    st.info("선택한 신뢰도 조건을 만족하는 조합이 없습니다. 신뢰도 기준을 낮춰보세요.")
+    st.stop()
+
+# show ranked table with top columns
+rank_table = reliable_combinations_sorted.reset_index(drop=True)
+rank_table.index = rank_table.index + 1
+st.dataframe(rank_table[['플랜트','제품범주2','중분류','reliability_score']].rename_axis('rank'))
+
+# 3) 사용자가 테이블에서 선택할 수 있도록 selectbox (테이블 클릭 선택은 기본 streamlit에서 제한적임)
+combo_options = [f"{r['플랜트']} > {r['제품범주2']} > {r['중분류']} (score {r['reliability_score']:.1f})" for _, r in reliable_combinations_sorted.iterrows()]
+selected_combo = st.selectbox("테이블에서 조합 선택 (또는 아래 상세 필터 활용)", combo_options)
+
+# parse selection into f1,f2,f3 defaults
+if selected_combo:
+    sel_parts = selected_combo.split(' > ')
+    sel_plant = sel_parts[0]
+    sel_category = sel_parts[1]
+    sel_sub = sel_parts[2].split(' (')[0]
+else:
+    sel_plant = sel_category = sel_sub = None
+
+# 4) 상세 필터 (선택사항) — 사용자가 선택하거나 override 가능
+c1, c2, c3 = st.columns(3)
+available_plants = ["(ALL)"] + sorted(combination_scores['플랜트'].unique().tolist())
+f1 = c1.selectbox("플랜트", available_plants, index=(available_plants.index(sel_plant) if sel_plant in available_plants else 0))
 
 # 제품범주2 선택 (플랜트 기반 필터링)
-filtered_scores = reliable_combinations
-if f1 != "(ALL)":
-    filtered_scores = filtered_scores[filtered_scores["플랜트"] == f1]
-available_cats = ["(ALL)"] + sorted(filtered_scores["제품범주2"].unique().tolist())
-f2 = c2.selectbox("제품범주2", available_cats, 0)
+filtered_scores = combination_scores if f1 == "(ALL)" else combination_scores[combination_scores['플랜트'] == f1]
+available_cats = ["(ALL)"] + sorted(filtered_scores['제품범주2'].unique().tolist())
+f2 = c2.selectbox("제품범주2", available_cats, index=(available_cats.index(sel_category) if sel_category in available_cats else 0))
 
-# 중분류 선택 (플랜트, 제품범주2 기반 필터링)
-if f2 != "(ALL)":
-    filtered_scores = filtered_scores[filtered_scores["제품범주2"] == f2]
-available_mids = ["(ALL)"] + sorted(filtered_scores["중분류"].unique().tolist())
-f3 = c3.selectbox("중분류", available_mids, 0)
+# 중분류
+filtered_scores = filtered_scores if f2 == "(ALL)" else filtered_scores[filtered_scores['제품범주2'] == f2]
+available_mids = ["(ALL)"] + sorted(filtered_scores['중분류'].unique().tolist())
+f3 = c3.selectbox("중분류", available_mids, index=(available_mids.index(sel_sub) if sel_sub in available_mids else 0))
 
 # 선택된 조합의 신뢰도 정보 표시
-if f1 != "(ALL)" or f2 != "(ALL)" or f3 != "(ALL)":
-    current_scores = filtered_scores
-    if f3 != "(ALL)":
-        current_scores = current_scores[current_scores["중분류"] == f3]
-    
-    if not current_scores.empty:
-        st.info(f"""
-        선택된 조합의 예측 신뢰도:
-        - 종합 신뢰도 점수: {current_scores['reliability_score'].mean():.1f}/100
-        - 예측 정확도 점수: {(current_scores['mae_score'].mean() + current_scores['rmse_score'].mean())/2:.1f}/100
-        - 신뢰구간 적절성: {current_scores['width_score'].mean():.1f}/100
-        - 신뢰구간 정확도: {current_scores['interval_score'].mean():.1f}/100
-        - 패턴 유사도: {current_scores['volatility_score'].mean():.1f}/100
-        - 결정계수(R²): {current_scores['r2'].mean():.3f}
-        """)
+current_scores = reliable_combinations_sorted
+if f1 != "(ALL)":
+    current_scores = current_scores[current_scores['플랜트'] == f1]
+if f2 != "(ALL)":
+    current_scores = current_scores[current_scores['제품범주2'] == f2]
+if f3 != "(ALL)":
+    current_scores = current_scores[current_scores['중분류'] == f3]
+
+if not current_scores.empty:
+    st.info(f"종합 신뢰도: {current_scores['reliability_score'].mean():.1f}/100 — 조합 수: {len(current_scores)}")
 
 # 선택된 조건으로 데이터 필터링
 sel = agg.copy()
@@ -236,13 +256,17 @@ def prepare_yearly_data(data, future_data=None):
     return yearly_data
 
 # 기본 데이터 준비
-ts = series_data["y"].reset_index(drop=True)
-psi = compute_psi(ts)
-amp = amplitude(ts)
-peaks = find_peaks_basic(ts)
-cps = detect_changepoints(ts)
-fc = fit_forecast(ts, horizon=26)
-ews = early_warning_rule(ts)
+series_data_sorted = series_data.sort_values('week')
+cutoff = pd.Timestamp('2024-12-31')
+train_mask = series_data_sorted['week'] <= cutoff
+
+ts_train = series_data_sorted[train_mask]["y"].values
+psi = compute_psi(ts_train)
+amp = amplitude(ts_train)
+peaks = find_peaks_basic(ts_train)
+cps = detect_changepoints(ts_train)
+fc = safe_forecast(pd.Series(ts_train), horizon=26, ci=ci)
+ews = early_warning_rule(pd.Series(ts_train))
 
 # 연도별 데이터 준비
 yearly_data = prepare_yearly_data(series_data, fc)
@@ -260,7 +284,7 @@ st.write("### 1. 클레임 발생 추세 및 예측")
 # 전체 시계열 데이터 준비
 series_data_sorted = series_data.copy().sort_values('week')
 future_dates = pd.date_range(
-    start=series_data['week'].iloc[-1] + pd.Timedelta(weeks=1),
+    start=pd.Timestamp('2025-01-01'),  # 2025년 1월부터 예측 시작
     periods=len(fc['yhat']),
     freq='W'
 )
@@ -322,7 +346,7 @@ recent_fig.add_trace(go.Scatter(
     fill='tonexty',
     mode='lines',
     line=dict(color='rgba(255, 127, 14, 0.3)', width=0),
-    name='95% 신뢰구간',
+    name=f'{int(ci*100)}% 신뢰구간',
     hoverinfo='skip'
 ))
 
@@ -358,10 +382,9 @@ st.write("### 2. 연도별 월간 패턴 비교")
 monthly_data = []
 month_names = []
 year_labels = []
-current_year = max(series_data['week'].dt.year)
 
 for year in sorted(yearly_data.keys()):
-    if year <= current_year:  # 실제 데이터만 포함
+    if year <= 2024:  # 2024년까지의 실제 데이터만 포함
         data = yearly_data[year]
         monthly_avg = []
         

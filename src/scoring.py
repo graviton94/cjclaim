@@ -17,7 +17,11 @@ def calculate_prediction_score(y_true: np.ndarray, y_pred: np.ndarray,
     Returns:
         성능 지표 딕셔너리 (MAE, RMSE, 신뢰구간 적정성 등)
     """
-    # 기본 통계량
+    # Ensure counts cannot be negative: clip inputs to >= 0 for all calculations
+    y_true = np.asarray(y_true, dtype=float)
+    y_true = np.clip(y_true, 0.0, None)
+
+    # 기본 통계량 (based on non-negative true values)
     y_mean = np.mean(y_true)
     y_std = np.std(y_true) if len(y_true) > 1 else 1.0
     # 안전한 denominators
@@ -28,10 +32,10 @@ def calculate_prediction_score(y_true: np.ndarray, y_pred: np.ndarray,
     historical_max = np.max(y_true) * 1.5 if len(y_true) > 0 else np.max([1.0])
     historical_min = max(0.0, np.min(y_true) * 0.5) if len(y_true) > 0 else 0.0
 
-    # 예측값 범위 제한
-    y_pred_clipped = np.clip(np.asarray(y_pred), historical_min, historical_max)
-    y_lower_clipped = np.clip(np.asarray(y_lower), historical_min, historical_max)
-    y_upper_clipped = np.clip(np.asarray(y_upper), historical_min, historical_max)
+    # 예측값 범위 제한: 또한 음수는 허용하지 않음
+    y_pred_clipped = np.clip(np.asarray(y_pred, dtype=float), max(0.0, historical_min), historical_max)
+    y_lower_clipped = np.clip(np.asarray(y_lower, dtype=float), max(0.0, historical_min), historical_max)
+    y_upper_clipped = np.clip(np.asarray(y_upper, dtype=float), max(0.0, historical_min), historical_max)
 
     # 1. MAE (Mean Absolute Error) - 절대오차
     mae = float(np.mean(np.abs(np.asarray(y_true) - y_pred_clipped)))
@@ -52,13 +56,13 @@ def calculate_prediction_score(y_true: np.ndarray, y_pred: np.ndarray,
         width_score = 100.0 * float(np.exp(-abs(np.log2(width_ratio))))
 
     # 3.2 실제값이 신뢰구간 안에 들어가는 비율
-    in_interval = float(np.mean((np.asarray(y_true) >= y_lower_clipped) & (np.asarray(y_true) <= y_upper_clipped))) * 100.0
+    in_interval = float(np.mean((y_true >= y_lower_clipped) & (y_true <= y_upper_clipped))) * 100.0
     # interval_score: 100 when in_interval == 95, decrease smoothly otherwise
     interval_score = 100.0 * float(np.exp(-abs(0.95 - (in_interval/100.0))))
 
     # 4. R-squared 계산 (보조 지표)
-    ss_res = float(np.sum((np.asarray(y_true) - y_pred_clipped) ** 2))
-    ss_tot = float(np.sum((np.asarray(y_true) - y_mean) ** 2))
+    ss_res = float(np.sum((y_true - y_pred_clipped) ** 2))
+    ss_tot = float(np.sum((y_true - y_mean) ** 2))
     r2 = 1.0 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
 
     # 5. 예측값의 변동성 체크
@@ -88,6 +92,9 @@ def calculate_prediction_score(y_true: np.ndarray, y_pred: np.ndarray,
     }
 
 def early_warning_rule(y: pd.Series) -> dict:
+    # counts cannot be negative; clip series to >=0
+    y = y.astype(float).clip(lower=0.0)
+
     if len(y) < (EWS_WINDOW_RECENT + EWS_WINDOW_BASE):
         return {"alert": False, "score": 0.0, "recent": np.nan, "baseline": np.nan, "sigma": np.nan}
     recent = float(np.mean(y[-EWS_WINDOW_RECENT:]))

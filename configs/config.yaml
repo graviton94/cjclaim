@@ -1,0 +1,19 @@
+# Batch pipeline configuration
+input:
+  raw_dir: data/raw
+  curated_path: data/curated/claims.parquet
+  features_path: data/features/psi_peaks_ruptures.parquet
+output:
+  models_dir: artifacts/models
+  forecasts_dir: artifacts/forecasts
+  adjustments_dir: artifacts/adjustments
+  mlflow_dir: artifacts/mlruns
+  reports_dir: reports
+  logs_dir: logs
+kpi:
+  mape: 0.20
+  bias: 0.05
+engine: pandas
+max_workers: 4
+timeout_tuning_min: 10
+series: all
