@@ -7,6 +7,7 @@ if PROJECT_ROOT not in sys.path:
 import importlib
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 # Quick runtime dependency check to provide a clear message in Streamlit
 _required_pkgs = [
@@ -57,51 +58,67 @@ agg = weekly_agg_from_counts(df)
 def get_filtered_options(df, plant=None, category=None):
     """선택된 조건에 따라 필터링된 옵션을 반환"""
     filtered = df.copy()
-    if plant and plant != "(ALL)":
-        filtered = filtered[filtered["플랜트"] == plant]
-    if category and category != "(ALL)":
-        filtered = filtered[filtered["제품범주2"] == category]
-    return filtered
 
 # 예측 성능이 좋은 조합 계산
 @st.cache_data
-def calculate_combination_scores(data):
-    """각 조합별 예측 성능 계산"""
+def calculate_combination_scores(data: pd.DataFrame) -> pd.DataFrame:
+    """각 조합별 예측 성능 계산
+
+    반환 컬럼: 플랜트, 제품범주2, 중분류, reliability_score, mae_score, rmse_score,
+    width_score, interval_score, volatility_score, r2
+    """
     from src.scoring import calculate_prediction_score
-    
+
     scores = []
     for name, group in data.groupby(GROUP_COLS):
-        if len(group) >= 26:  # 최소 6개월 데이터 필요
-            group_sorted = group.sort_values('week')
-            y = group_sorted['y'].values
-            
-            # 마지막 6개월을 테스트 셋으로 사용
-            train_size = len(y) - 26
-            y_train = y[:train_size]
-            y_test = y[train_size:]
-            
-            # 예측 수행
+        group_sorted = group.sort_values('week')
+        if len(group_sorted) < 26:
+            continue
+
+        y = group_sorted['y'].values
+        # train: all but last 26, test: last 26
+        train_size = max(1, len(y) - 26)
+        if train_size < 1:
+            continue
+        y_train = y[:train_size]
+        y_test = y[train_size:]
+
+        try:
             fc = fit_forecast(pd.Series(y_train), horizon=26)
-            
-            if len(y_test) > 0:
-                # 성능 지표 계산
-                score = calculate_prediction_score(
-                    y_test,
-                    fc['yhat'],
-                    fc['yhat_lower'],
-                    fc['yhat_upper']
-                )
-                
-                scores.append({
-                    '플랜트': name[0],
-                    '제품범주2': name[1],
-                    '중분류': name[2],
-                    'reliability_score': score['reliability_score'],
-                    'mape': score['mape'],
-                    'r2': score['r2'],
-                    'interval_width': score['interval_width']
-                })
-    
+        except Exception:
+            # if forecasting fails, skip this group
+            continue
+
+        # get arrays and truncate/pad to test length
+        yhat = np.asarray(fc.get('yhat', []))[:len(y_test)]
+        yhat_lower = np.asarray(fc.get('yhat_lower', []))[:len(y_test)]
+        yhat_upper = np.asarray(fc.get('yhat_upper', []))[:len(y_test)]
+
+        if len(y_test) == 0 or yhat.size == 0:
+            continue
+
+        # calculate score (guard internally)
+        try:
+            score = calculate_prediction_score(np.asarray(y_test), yhat, yhat_lower, yhat_upper)
+        except Exception:
+            continue
+
+        scores.append({
+            '플랜트': name[0],
+            '제품범주2': name[1],
+            '중분류': name[2],
+            'reliability_score': float(score.get('reliability_score', 0.0)),
+            'mae_score': float(score.get('mae_score', 0.0)),
+            'rmse_score': float(score.get('rmse_score', 0.0)),
+            'width_score': float(score.get('width_score', 0.0)),
+            'interval_score': float(score.get('interval_score', 0.0)),
+            'volatility_score': float(score.get('volatility_score', 0.0)),
+            'r2': float(score.get('r2', 0.0))
+        })
+
+    if len(scores) == 0:
+        return pd.DataFrame(columns=['플랜트','제품범주2','중분류','reliability_score','mae_score','rmse_score','width_score','interval_score','volatility_score','r2'])
+
     return pd.DataFrame(scores)
 
 # 신뢰도 점수 계산
@@ -153,9 +170,11 @@ if f1 != "(ALL)" or f2 != "(ALL)" or f3 != "(ALL)":
         st.info(f"""
         선택된 조합의 예측 신뢰도:
         - 종합 신뢰도 점수: {current_scores['reliability_score'].mean():.1f}/100
-        - 평균 예측 오차(MAPE): {current_scores['mape'].mean():.1f}%
+        - 예측 정확도 점수: {(current_scores['mae_score'].mean() + current_scores['rmse_score'].mean())/2:.1f}/100
+        - 신뢰구간 적절성: {current_scores['width_score'].mean():.1f}/100
+        - 신뢰구간 정확도: {current_scores['interval_score'].mean():.1f}/100
+        - 패턴 유사도: {current_scores['volatility_score'].mean():.1f}/100
         - 결정계수(R²): {current_scores['r2'].mean():.3f}
-        - 평균 신뢰구간 너비: {current_scores['interval_width'].mean():.1f}%
         """)
 
 # 선택된 조건으로 데이터 필터링
