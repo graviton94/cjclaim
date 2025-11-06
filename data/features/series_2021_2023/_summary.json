@@ -1,9 +1,0 @@
-{
-  "total_series": 2608,
-  "created_files": 2608,
-  "skipped_series": 0,
-  "min_records_threshold": 1,
-  "has_quality_metadata": true,
-  "input_file": "data/curated/claims_base_2021_2023.parquet",
-  "output_directory": "data\\features\\series_2021_2023"
-}

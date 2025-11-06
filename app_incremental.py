@@ -17,16 +17,7 @@ st.title("📊 품질 클레임 예측 관리 시스템")
 st.markdown("**예측 대시보드 | 월별 데이터 업로드 | 증분학습 | Reconcile 보정**")
 
 # 사이드바 - 설정
-st.sidebar.header("⚙️ 설정")
-
-# 연도/월 선택
-current_year = datetime.now().year
-selected_year = st.sidebar.selectbox("연도", range(2024, current_year + 2))
-selected_month = st.sidebar.selectbox("월", range(1, 13))
-month_key = f"{selected_year}-{selected_month:02d}"
-
-st.sidebar.markdown("---")
-st.sidebar.info(f"**대상 월:** {month_key}")
+st.sidebar.header("⚙️ 시스템 정보")
 
 # Lag 통계 파일 확인
 lag_stats_path = Path("artifacts/metrics/lag_stats_from_raw.csv")
@@ -48,7 +39,7 @@ with tab1:
     st.markdown("**현재 학습된 모델로 향후 6개월 클레임 예측**")
     
     # 모델 및 데이터 디렉토리 확인
-    models_dir = Path("artifacts/models/base_2021_2023")
+    models_dir = Path("artifacts/models/base_monthly")
     features_dir = Path("data/features")
     
     if not models_dir.exists() or not features_dir.exists():
@@ -78,14 +69,14 @@ with tab1:
                         with open(json_file, 'r', encoding='utf-8') as f:
                             data = json.load(f)
                         
-                        # JSON 구조: {series_id, plant, product_cat2, mid_category, data: [{year, week, claim_count, ...}]}
+                        # JSON 구조: {series_id, plant, product_cat2, mid_category, data: [{year, month, claim_count, ...}]}
                         data_records = data.get('data', [])
                         
                         if data_records:
                             last_record = data_records[-1]
-                            last_week = f"{last_record['year']}-W{last_record['week']:02d}"
+                            last_month = f"{last_record['year']}-{last_record['month']:02d}"
                         else:
-                            last_week = None
+                            last_month = None
                         
                         metadata.append({
                             'plant': data.get('plant', 'Unknown'),
@@ -93,7 +84,7 @@ with tab1:
                             'mid_category': data.get('mid_category', 'Unknown'),
                             'series_id': data.get('series_id', 'Unknown'),
                             'total_records': len(data_records),
-                            'last_week': last_week,
+                            'last_month': last_month,
                             'json_file': str(json_file)
                         })
                     except Exception as e:
@@ -127,178 +118,80 @@ with tab1:
                     st.info("**먼저 Base 학습을 실행하세요:**")
                     st.code("python batch.py train --mode base --workers 4", language="bash")
                     st.caption("2021-2023 데이터로 Base 모델 학습")
-            else:
                 st.subheader("🎯 예측 시리즈 선택")
                 
-                # Top 5 EWS 위험 시리즈 계산
-                st.markdown("### � EWS 위험도 Top 5")
-                st.caption("모델 예측 기반: 예측 확실도 × EWS 임계값 근접도")
+                # EWS 위험도 Top 5 표시
+                st.markdown("### ⚠️ EWS 위험도 Top 5")
+                st.caption("6개월 예측 기반 상대적 위험도 점수 (증가율, 변동성, 계절성, 가속도 종합)")
                 
-                with st.spinner("Top 5 위험 시리즈 분석 중..."):
-                    ews_candidates = []
-                    models_dir = Path("artifacts/models")
+                # EWS 점수 로드 또는 계산
+                ews_file = Path("artifacts/metrics/ews_scores.csv")
+                
+                if ews_file.exists():
+                    df_ews = pd.read_csv(ews_file)
+                    top5 = df_ews.head(5)
                     
-                    # 디버깅 정보
-                    total_series = len(metadata_df)
-                    processed = 0
-                    skipped_no_data = 0
-                    skipped_no_model = 0
-                    skipped_low_ratio = 0
-                    errors = 0
-                    
-                    # 설정
-                    FORECAST_WEEKS = 4  # 4주 예측
-                    EWS_THRESHOLD_MULTIPLIER = 1.5  # 과거 평균의 1.5배 이상이면 경고
-                    
-                    for idx, row in metadata_df.iterrows():
-                        try:
-                            # JSON 데이터 로드
-                            with open(row['json_file'], 'r', encoding='utf-8') as f:
-                                json_data = json.load(f)
-                            
-                            data_records = json_data.get('data', [])
-                            if len(data_records) < 52:  # 최소 1년 데이터 필요
-                                skipped_no_data += 1
-                                continue
-                            
-                            # 모델 파일 로드
-                            series_id = row['series_id']
-                            safe_filename = (series_id.replace('/', '_').replace('\\', '_').replace(':', '_')
-                                           .replace('|', '_').replace('?', '_').replace('*', '_')
-                                           .replace('<', '_').replace('>', '_').replace('"', '_'))
-                            model_path = models_dir / f"{safe_filename}.pkl"
-                            
-                            if not model_path.exists():
-                                skipped_no_model += 1
-                                continue
-                            
-                            # 모델 로드
-                            import pickle
-                            with open(model_path, 'rb') as f:
-                                model_result = pickle.load(f)
-                            
-                            if isinstance(model_result, dict):
-                                fitted_model = model_result.get('model')
-                            else:
-                                fitted_model = model_result
-                            
-                            if fitted_model is None:
-                                skipped_no_model += 1
-                                continue
-                            
-                            # 예측 생성 (4주)
-                            forecast_obj = fitted_model.get_forecast(steps=FORECAST_WEEKS)
-                            forecast_mean = forecast_obj.predicted_mean
-                            forecast_ci_obj = forecast_obj.conf_int(alpha=0.05)  # 95% 신뢰구간
-                            
-                            # 예측값 및 신뢰구간
-                            yhat_values = forecast_mean if isinstance(forecast_mean, np.ndarray) else forecast_mean.values
-                            yhat_lower = forecast_ci_obj.iloc[:, 0].values if hasattr(forecast_ci_obj, 'iloc') else forecast_ci_obj[:, 0]
-                            yhat_upper = forecast_ci_obj.iloc[:, 1].values if hasattr(forecast_ci_obj, 'iloc') else forecast_ci_obj[:, 1]
-                            
-                            # 음수 처리
-                            yhat_values = np.maximum(yhat_values, 0)
-                            yhat_lower = np.maximum(yhat_lower, 0)
-                            yhat_upper = np.maximum(yhat_upper, 0)
-                            
-                            # 예측 평균
-                            forecast_avg = yhat_values.mean()
-                            
-                            # 과거 평균 (최근 26주)
-                            recent_data = data_records[-26:] if len(data_records) >= 26 else data_records
-                            historical_avg = sum(r['claim_count'] for r in recent_data) / len(recent_data)
-                            
-                            # 1. 예측 확실도 (Prediction Confidence)
-                            # 신뢰구간 폭의 역수 (좁을수록 확실)
-                            ci_width = (yhat_upper - yhat_lower).mean()
-                            if ci_width > 0 and forecast_avg > 0:
-                                confidence_score = 1 / (1 + ci_width / (forecast_avg + 0.1))  # 0~1 사이
-                            else:
-                                confidence_score = 0
-                            
-                            # 2. EWS Score (Early Warning Score)
-                            # 예측값이 과거 평균 대비 얼마나 높은지
-                            if historical_avg > 0:
-                                ews_ratio = forecast_avg / historical_avg
-                                # EWS 임계값(1.5배) 근접도
-                                ews_proximity = abs(ews_ratio - EWS_THRESHOLD_MULTIPLIER) / EWS_THRESHOLD_MULTIPLIER
-                                ews_score = 1 / (1 + ews_proximity)  # 임계값에 가까울수록 1
-                            else:
-                                ews_ratio = 0
-                                ews_score = 0
-                            
-                            # 3. 종합 위험도 점수
-                            # 예측이 확실하고(confidence_score 높음) + EWS 임계값에 가까움(ews_score 높음)
-                            risk_score = confidence_score * ews_score * (1 + ews_ratio * 0.1)  # 예측값도 반영
-                            
-                            # 예측값이 임계값보다 낮으면 제외
-                            if ews_ratio < 1.0:
-                                skipped_low_ratio += 1
-                                continue
-                            
-                            processed += 1
-                            
-                            ews_candidates.append({
-                                'series_id': series_id,
-                                'plant': row['plant'],
-                                'product_cat2': row['product_cat2'],
-                                'mid_category': row['mid_category'],
-                                'forecast_avg': forecast_avg,
-                                'historical_avg': historical_avg,
-                                'ews_ratio': ews_ratio,
-                                'confidence_score': confidence_score,
-                                'ews_score': ews_score,
-                                'risk_score': risk_score,
-                                'json_file': row['json_file']
-                            })
-                        except Exception as e:
-                            errors += 1
-                            continue
-                    
-                    # 디버깅 정보 표시
-                    with st.expander("🔍 분석 상세 정보"):
-                        col1, col2, col3, col4 = st.columns(4)
-                        with col1:
-                            st.metric("총 시리즈", total_series)
-                        with col2:
-                            st.metric("성공", processed)
-                        with col3:
-                            st.metric("데이터 부족", skipped_no_data)
-                        with col4:
-                            st.metric("모델 없음", skipped_no_model)
+                    # Top 5 테이블 표시
+                    display_data = []
+                    for _, row in top5.iterrows():
+                        # 시리즈 정보 파싱
+                        parts = row['series_id'].split('|')
+                        plant = parts[0] if len(parts) > 0 else ''
+                        product = parts[1] if len(parts) > 1 else ''
+                        category = parts[2] if len(parts) > 2 else ''
                         
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("EWS < 1.0", skipped_low_ratio)
-                        with col2:
-                            st.metric("에러", errors)
-                        with col3:
-                            st.metric("후보", len(ews_candidates))
+                        # MAPE 기반 신뢰도 (낮을수록 좋음)
+                        mape = row.get('growth_score', 0)  # 임시로 growth_score 사용
+                        confidence_pct = max(0, 100 - mape)
+                        
+                        display_data.append({
+                            '랭킹': f"🔥 {int(row['rank'])}위",
+                            '시리즈': f"{plant} | {product}",
+                            '중분류': category,
+                            'EWS점수': f"{row['total_score']:.1f}",
+                            '신뢰도': f"{confidence_pct:.0f}%",
+                            '예상시점': f"2024-{int(row.get('forecast_month', 1)):02d}",
+                            '예상건수': f"{row['forecast_max']:.1f}건"
+                        })
                     
-                    if ews_candidates:
-                        top_df = pd.DataFrame(ews_candidates).sort_values('risk_score', ascending=False).head(5)
-                        
-                        # 테이블 표시
-                        display_top = top_df[['plant', 'product_cat2', 'mid_category', 'forecast_avg', 'historical_avg', 'ews_ratio', 'risk_score']].copy()
-                        display_top.columns = ['플랜트', '제품범주2', '중분류', '4주 예측 평균', '과거 평균', 'EWS 비율', '위험도']
-                        display_top['4주 예측 평균'] = display_top['4주 예측 평균'].round(2)
-                        display_top['과거 평균'] = display_top['과거 평균'].round(2)
-                        display_top['EWS 비율'] = display_top['EWS 비율'].round(2)
-                        display_top['위험도'] = display_top['위험도'].round(3)
-                        
-                        st.dataframe(display_top, use_container_width=True, hide_index=True)
-                        
-                        st.caption("**위험도**: 예측 확실도 × EWS 임계값 근접도 (높을수록 위험)")
-                        st.caption("**EWS 비율**: 예측값 / 과거 평균 (1.5배 이상이면 경고)")
-                    else:
-                        st.info("EWS 위험 시리즈가 없습니다.")
+                    df_display = pd.DataFrame(display_data)
+                    st.dataframe(df_display, use_container_width=True, hide_index=True)
+                    
+                    # 상세 정보 (확장 가능)
+                    with st.expander("📊 위험도 점수 구성 보기"):
+                        for _, row in top5.iterrows():
+                            st.markdown(f"**[{int(row['rank'])}위] {row['series_id']}** - 종합 {row['total_score']:.1f}점")
+                            
+                            col1, col2, col3, col4 = st.columns(4)
+                            with col1:
+                                st.metric("증가율", f"{row['growth_score']:.1f}", 
+                                         f"{row['growth_rate_pct']:+.0f}%")
+                            with col2:
+                                st.metric("변동성", f"{row['volatility_score']:.1f}")
+                            with col3:
+                                st.metric("계절성", f"{row['seasonality_score']:.1f}")
+                            with col4:
+                                st.metric("가속도", f"{row['acceleration_score']:.1f}")
+                            
+                            st.caption(f"평균: {row['historical_mean']:.1f} → {row['forecast_mean']:.1f} 건/월 (최대: {row['forecast_max']:.1f})")
+                            st.markdown("---")
+                else:
+                    st.warning("⚠️ EWS 점수가 계산되지 않았습니다.")
+                    st.info("예측 생성 후 EWS 점수를 계산하세요:")
+                    st.code("python src/ews_scoring.py --forecast artifacts/forecasts/2024/forecast_2024_01.parquet", language="bash")
                 
                 st.markdown("---")
                 
-                # 시리즈 선택 UI - 계층적 필터링
-                st.markdown("### 🔍 시리즈 검색 및 선택")
+                # 시리즈 필터링 UI
+                st.markdown("### 🔮 향후 6개월 클레임 예측")
                 
                 col1, col2, col3 = st.columns(3)
+                st.markdown("---")
+                
+                # 시리즈 선택 UI - 계층적 필터링
+                st.markdown("### � 향후 6개월 클레임 예측")
+                
+                col1, col2, col3, col4 = st.columns(4)
                 
                 # 1단계: 플랜트 선택
                 with col1:
@@ -321,6 +214,11 @@ with tab1:
                     mid_categories = sorted(filtered_by_cat2['mid_category'].unique().tolist())
                     selected_mid = st.selectbox("중분류", mid_categories, key="forecast_mid")
                 
+                # 4단계: 신뢰구간 선택
+                with col4:
+                    ci_choice = st.selectbox("신뢰구간", ["95%", "99%"], index=0, key="ci")
+                    ci = 0.99 if ci_choice == "99%" else 0.95
+                
                 # 최종 필터링
                 final_filtered = filtered_by_cat2[filtered_by_cat2['mid_category'] == selected_mid]
                 
@@ -331,97 +229,104 @@ with tab1:
                     
                     st.info(f"✅ 선택된 시리즈: **{series_id}**")
                     
-                    # 예측 설정
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        horizon_weeks = st.slider("예측 기간 (주)", 4, 26, 24, help="6개월 = 24주", key="horizon")
-                    with col2:
-                        ci_choice = st.selectbox("신뢰구간", ["95%", "99%"], index=0, key="ci")
-                        ci = 0.99 if ci_choice == "99%" else 0.95
-                        
-                        # 예측 실행
-                        if st.button("🔮 예측 실행", type="primary"):
-                            with st.spinner(f"{series_id} 예측 중..."):
-                                try:
-                                    # JSON 데이터 로드
-                                    import pickle
-                                    from datetime import timedelta
-                                    import plotly.graph_objects as go
+                    st.markdown("---")
+                    
+                    # 예측 실행 버튼 - 6개월 고정
+                    horizon_months = 6  # 6개월 고정
+                    if st.button("🔮 예측 실행", type="primary", use_container_width=True):
+                        with st.spinner(f"{series_id} 예측 중..."):
+                            try:
+                                # JSON 데이터 로드
+                                import pickle
+                                from datetime import timedelta
+                                from dateutil.relativedelta import relativedelta
+                                import plotly.graph_objects as go
+                                
+                                with open(series_info['json_file'], 'r', encoding='utf-8') as f:
+                                    json_data = json.load(f)
+                                
+                                # JSON 구조: data = [{year, month, claim_count, ...}]
+                                data_records = json_data.get('data', [])
+                                
+                                if not data_records:
+                                    st.error(f"시리즈 {series_id}에 데이터가 없습니다.")
+                                else:
+                                    # DataFrame 생성
+                                    df_hist = pd.DataFrame(data_records)
+                                    df_hist['month_date'] = pd.to_datetime(
+                                        df_hist['year'].astype(str) + '-' + df_hist['month'].astype(str).str.zfill(2) + '-01'
+                                    )
+                                    df_hist = df_hist.rename(columns={'claim_count': 'y'})
+                                    df_hist = df_hist.sort_values('month_date')
                                     
-                                    with open(series_info['json_file'], 'r', encoding='utf-8') as f:
-                                        json_data = json.load(f)
+                                    # 모델 파일 로드
+                                    # series_id에서 | 구분자로 파일명 생성
+                                    safe_filename = (series_id.replace('/', '_').replace('\\', '_').replace(':', '_')
+                                                   .replace('|', '_').replace('?', '_').replace('*', '_')
+                                                   .replace('<', '_').replace('>', '_').replace('"', '_'))
+                                    model_path = models_dir / f"{safe_filename}.pkl"
                                     
-                                    # JSON 구조: data = [{year, week, claim_count, ...}]
-                                    data_records = json_data.get('data', [])
+                                    st.info(f"🔍 찾는 모델 파일: `{model_path.name}`")
                                     
-                                    if not data_records:
-                                        st.error(f"시리즈 {series_id}에 데이터가 없습니다.")
-                                    else:
-                                        # DataFrame 생성
-                                        df_hist = pd.DataFrame(data_records)
-                                        df_hist['week_date'] = pd.to_datetime(
-                                            df_hist['year'].astype(str) + '-W' + df_hist['week'].astype(str).str.zfill(2) + '-1',
-                                            format='%Y-W%W-%w'
-                                        )
-                                        df_hist = df_hist.rename(columns={'claim_count': 'y'})
-                                        df_hist = df_hist.sort_values('week_date')
-                                        df_hist = df_hist.sort_values('week_date')
+                                    if model_path.exists():
+                                        with open(model_path, 'rb') as f:
+                                            model_result = pickle.load(f)
                                         
-                                        # 모델 파일 로드
-                                        # series_id에서 | 구분자로 파일명 생성
-                                        safe_filename = (series_id.replace('/', '_').replace('\\', '_').replace(':', '_')
-                                                       .replace('|', '_').replace('?', '_').replace('*', '_')
-                                                       .replace('<', '_').replace('>', '_').replace('"', '_'))
-                                        model_path = models_dir / f"{safe_filename}.pkl"
+                                        # 월별 모델: params를 SARIMAX에 직접 적용
+                                        from statsmodels.tsa.statespace.sarimax import SARIMAX
                                         
-                                        st.info(f"🔍 찾는 모델 파일: `{model_path.name}`")
+                                        # 학습 데이터 범위 결정: 2021년부터 최신 데이터까지
+                                        # (2011-2020은 대부분 0이므로 제외)
+                                        df_train = df_hist[df_hist['month_date'].dt.year >= 2021].copy()
                                         
-                                        if model_path.exists():
-                                            with open(model_path, 'rb') as f:
-                                                model_result = pickle.load(f)
+                                        if len(df_train) < 12:
+                                            st.error(f"훈련 데이터 부족: {len(df_train)}개월 (최소 12개월 필요)")
+                                        else:
+                                            y = df_train['y'].values
                                             
-                                            # 모델에서 학습된 모델 객체 가져오기
-                                            if isinstance(model_result, dict):
-                                                fitted_model = model_result.get('model')
-                                            else:
-                                                fitted_model = model_result
+                                            # SARIMAX 모델 생성 및 파라미터 적용
+                                            model = SARIMAX(
+                                                y,
+                                                order=model_result['model_spec']['order'],
+                                                seasonal_order=model_result['model_spec']['seasonal_order'],
+                                                enforce_stationarity=False,
+                                                enforce_invertibility=False
+                                            )
+                                            
+                                            params = np.array(model_result['params'])
+                                            fitted_model = model.smooth(params)
                                             
                                             # 예측 생성
-                                            forecast_obj = fitted_model.get_forecast(steps=horizon_weeks)
-                                            forecast_mean = forecast_obj.predicted_mean
-                                            forecast_ci_obj = forecast_obj.conf_int(alpha=1-ci)
+                                            forecast_mean = fitted_model.forecast(steps=horizon_months)
                                             
-                                            # 마지막 주차 이후 날짜 생성
-                                            last_week = df_hist['week_date'].iloc[-1]
-                                            future_weeks = [last_week + timedelta(weeks=i+1) for i in range(horizon_weeks)]
+                                            # 마지막 월 이후 날짜 생성
+                                            last_month = df_train['month_date'].iloc[-1]
+                                            future_months = [last_month + relativedelta(months=i+1) for i in range(horizon_months)]
                                             
-                                            # numpy array를 확인하고 적절히 변환
-                                            yhat_values = forecast_mean if isinstance(forecast_mean, np.ndarray) else forecast_mean.values
-                                            yhat_lower_values = forecast_ci_obj.iloc[:, 0].values if hasattr(forecast_ci_obj, 'iloc') else forecast_ci_obj[:, 0]
-                                            yhat_upper_values = forecast_ci_obj.iloc[:, 1].values if hasattr(forecast_ci_obj, 'iloc') else forecast_ci_obj[:, 1]
-                                            
-                                            # 신뢰구간 음수 처리 (클레임은 음수가 될 수 없음)
-                                            yhat_lower_values = np.maximum(yhat_lower_values, 0)
-                                            yhat_values = np.maximum(yhat_values, 0)
-                                            yhat_upper_values = np.maximum(yhat_upper_values, 0)
+                                            # 음수 처리 (클레임은 음수가 될 수 없음)
+                                            yhat_values = np.maximum(forecast_mean, 0)
                                             
                                             df_forecast = pd.DataFrame({
-                                                'week': future_weeks,
-                                                'yhat': yhat_values,
-                                                'yhat_lower': yhat_lower_values,
-                                                'yhat_upper': yhat_upper_values
+                                                'month': future_months,
+                                                'yhat': yhat_values
                                             })
+                                            
+                                            # 학습 기간 표시
+                                            train_start_year = df_train['month_date'].dt.year.min()
+                                            train_end_year = df_train['month_date'].dt.year.max()
+                                            train_period = f"{train_start_year}-{train_end_year}" if train_start_year != train_end_year else str(train_start_year)
                                             
                                             # 메트릭 표시
                                             col1, col2, col3, col4 = st.columns(4)
                                             with col1:
-                                                st.metric("학습 데이터", f"{len(df_hist)}주")
+                                                st.metric("학습 데이터", f"{len(df_train)}개월 ({train_period})")
                                             with col2:
-                                                avg_claims = df_hist['y'].mean()
-                                                st.metric("평균 클레임", f"{avg_claims:.1f}건/주")
+                                                avg_claims = df_train['y'].mean()
+                                                st.metric("평균 클레임", f"{avg_claims:.1f}건/월")
                                             with col3:
-                                                last_claim = df_hist['y'].iloc[-1]
-                                                st.metric("최근 클레임", f"{last_claim:.0f}건")
+                                                last_claim = df_train['y'].iloc[-1]
+                                                last_month_str = df_train['month_date'].iloc[-1].strftime('%Y-%m')
+                                                st.metric(f"최근 클레임 ({last_month_str})", f"{last_claim:.0f}건")
                                             with col4:
                                                 forecast_avg = df_forecast['yhat'].mean()
                                                 change = ((forecast_avg - avg_claims) / avg_claims * 100) if avg_claims > 0 else 0
@@ -432,19 +337,19 @@ with tab1:
                                             
                                             fig = go.Figure()
                                             
-                                            # 과거 데이터
+                                            # 훈련 데이터 (2021-2023)
                                             fig.add_trace(go.Scatter(
-                                                x=df_hist['week_date'],
-                                                y=df_hist['y'],
+                                                x=df_train['month_date'],
+                                                y=df_train['y'],
                                                 mode='lines+markers',
-                                                name='실제 데이터',
+                                                name='실제 데이터 (2021-2023)',
                                                 line=dict(color='#1f77b4', width=2),
                                                 marker=dict(size=4)
                                             ))
                                             
                                             # 예측값
                                             fig.add_trace(go.Scatter(
-                                                x=df_forecast['week'],
+                                                x=df_forecast['month'],
                                                 y=df_forecast['yhat'],
                                                 mode='lines+markers',
                                                 name='예측',
@@ -452,20 +357,9 @@ with tab1:
                                                 marker=dict(size=6)
                                             ))
                                             
-                                            # 신뢰구간
-                                            fig.add_trace(go.Scatter(
-                                                x=df_forecast['week'].tolist() + df_forecast['week'].tolist()[::-1],
-                                                y=df_forecast['yhat_upper'].tolist() + df_forecast['yhat_lower'].tolist()[::-1],
-                                                fill='toself',
-                                                fillcolor='rgba(255, 127, 14, 0.2)',
-                                                line=dict(color='rgba(255,255,255,0)'),
-                                                name=f'{ci_choice} 신뢰구간',
-                                                showlegend=True
-                                            ))
-                                            
                                             fig.update_layout(
-                                                title=f"{series_id} - {horizon_weeks}주 예측",
-                                                xaxis_title="주차",
+                                                title=f"{series_id} - {horizon_months}개월 예측",
+                                                xaxis_title="월",
                                                 yaxis_title="클레임 건수",
                                                 hovermode='x unified',
                                                 height=500,
@@ -473,19 +367,18 @@ with tab1:
                                                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                                             )
                                             
-                                            st.plotly_chart(fig, width='stretch')
+                                            st.plotly_chart(fig, use_container_width=True)
                                             
                                             # 예측 테이블
                                             st.subheader("📋 예측 상세")
                                             
                                             df_forecast_display = df_forecast.copy()
-                                            df_forecast_display['week'] = df_forecast_display['week'].dt.strftime('%Y-%m-%d')
+                                            df_forecast_display['month'] = df_forecast_display['month'].dt.strftime('%Y-%m')
                                             df_forecast_display['yhat'] = df_forecast_display['yhat'].round(1)
-                                            df_forecast_display['yhat_lower'] = df_forecast_display['yhat_lower'].round(1)
-                                            df_forecast_display['yhat_upper'] = df_forecast_display['yhat_upper'].round(1)
-                                            df_forecast_display.columns = ['주차', '예측값', '하한', '상한']
+                                            df_forecast_display['yhat'] = df_forecast_display['yhat'].round(1)
+                                            df_forecast_display.columns = ['월', '예측값']
                                             
-                                            st.dataframe(df_forecast_display, width='stretch', hide_index=True)
+                                            st.dataframe(df_forecast_display, use_container_width=True, hide_index=True)
                                             
                                             # 다운로드 버튼
                                             csv = df_forecast.to_csv(index=False, encoding='utf-8-sig')
@@ -493,25 +386,107 @@ with tab1:
                                                 label="📥 예측 결과 다운로드 (CSV)",
                                                 data=csv,
                                                 file_name=f"forecast_{series_id}_{datetime.now().strftime('%Y%m%d')}.csv",
-                                                mime="text/csv"
+                                                mime="text/csv",
+                                                use_container_width=True
                                             )
-                                        
-                                        else:
-                                            st.error(f"❌ 모델 파일이 없습니다: {safe_filename}.pkl")
-                                
-                                except Exception as e:
-                                    st.error(f"❌ 예측 실패: {str(e)}")
-                                    st.exception(e)
+                                    
+                                    else:
+                                        st.error(f"❌ 모델 파일이 없습니다: {safe_filename}.pkl")
+                            
+                            except Exception as e:
+                                st.error(f"❌ 예측 실패: {str(e)}")
+                                st.exception(e)
 
 # Tab 2: 데이터 업로드
 with tab2:
     st.header("1️⃣ 월별 데이터 업로드")
     
+    # 학습 데이터 현황 테이블
+    st.subheader("📊 학습 데이터 현황")
+    
+    features_dir = Path("data/features")
+    if features_dir.exists() and any(features_dir.glob("*.json")):
+        with st.spinner("학습 데이터 분석 중..."):
+            # 년/월별 데이터 수집
+            year_month_data = {}
+            total_series = 0
+            
+            for json_file in features_dir.glob("*.json"):
+                try:
+                    with open(json_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    
+                    records = data.get('data', [])
+                    if not records:
+                        continue
+                    
+                    total_series += 1
+                    
+                    # 각 레코드의 year/month 수집
+                    for record in records:
+                        year = record.get('year')
+                        month = record.get('month')
+                        
+                        if year and month:
+                            key = (year, month)
+                            if key not in year_month_data:
+                                year_month_data[key] = 0
+                            year_month_data[key] += 1
+                
+                except Exception as e:
+                    continue
+            
+            if year_month_data:
+                # 년도 추출 및 정렬
+                years = sorted(set(year for year, month in year_month_data.keys()))
+                months = list(range(1, 13))
+                
+                # 테이블 데이터 생성
+                table_data = []
+                for month in months:
+                    row = {'월': f"{month}월"}
+                    for year in years:
+                        count = year_month_data.get((year, month), 0)
+                        # 데이터 충분성 판단 (시리즈 수의 80% 이상이면 충분)
+                        threshold = total_series * 0.8
+                        if count >= threshold:
+                            status = "✅"
+                        elif count >= threshold * 0.5:
+                            status = "⚠️"
+                        else:
+                            status = "❌"
+                        row[f"{year}년"] = f"{status} {count}"
+                    table_data.append(row)
+                
+                # DataFrame 생성 및 표시
+                df_status = pd.DataFrame(table_data)
+                st.dataframe(df_status, use_container_width=True, hide_index=True)
+                
+                # 범례
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.caption(f"**총 시리즈**: {total_series:,}개")
+                with col2:
+                    st.caption("**✅ 충분**: ≥80% 시리즈")
+                with col3:
+                    st.caption("**⚠️ 보통**: 40-80% 시리즈")
+                with col4:
+                    st.caption("**❌ 부족**: <40% 시리즈")
+            else:
+                st.info("학습 데이터가 없습니다.")
+    else:
+        st.warning("Feature JSON 파일이 없습니다. 먼저 Base 학습을 실행하세요.")
+    
+    st.markdown("---")
+    
+    # 업로드할 데이터의 년/월은 CSV에서 자동 감지
+    st.subheader("2️⃣ 월별 데이터 업로드")
+    
     col1, col2 = st.columns([2, 1])
     
     with col1:
         uploaded_file = st.file_uploader(
-            f"**{month_key} 월별 데이터 CSV 업로드**",
+            f"**CSV 파일 업로드**",
             type=['csv'],
             help="발생일자 기준 1개월 데이터 (플랜트, 제품범주2, 중분류(보정), 발생일자, 제조일자, count 컬럼 필수)"
         )
@@ -531,16 +506,32 @@ count
         # 임시 저장
         temp_dir = Path("artifacts/temp")
         temp_dir.mkdir(parents=True, exist_ok=True)
-        temp_path = temp_dir / f"upload_{month_key.replace('-', '')}.csv"
         
-        with open(temp_path, 'wb') as f:
-            f.write(uploaded_file.getvalue())
-        
-        # 데이터 미리보기
+        # 데이터 미리보기 및 년/월 자동 감지
         st.success(f"✅ 파일 업로드 완료: {uploaded_file.name}")
         
         try:
-            df_preview = pd.read_csv(temp_path, encoding='utf-8-sig', nrows=10)
+            df_preview = pd.read_csv(uploaded_file, encoding='utf-8-sig', nrows=10)
+            
+            # 전체 데이터 로드
+            uploaded_file.seek(0)  # 파일 포인터 초기화
+            df_full = pd.read_csv(uploaded_file, encoding='utf-8-sig')
+            
+            # 발생일자에서 년/월 자동 감지
+            if '발생일자' in df_full.columns:
+                df_full['발생일자'] = pd.to_datetime(df_full['발생일자'])
+                detected_year = df_full['발생일자'].dt.year.mode()[0]  # 최빈값
+                detected_month = df_full['발생일자'].dt.month.mode()[0]  # 최빈값
+                month_key = f"{detected_year}-{detected_month:02d}"
+                
+                st.info(f"📅 **감지된 대상 월:** {month_key}")
+            else:
+                st.error("'발생일자' 컬럼이 없습니다.")
+                st.stop()
+            
+            # 임시 파일 저장
+            temp_path = temp_dir / f"upload_{month_key.replace('-', '')}.csv"
+            df_full.to_csv(temp_path, index=False, encoding='utf-8-sig')
             st.subheader("📋 데이터 미리보기")
             st.dataframe(df_preview, width='stretch')
             
@@ -639,9 +630,9 @@ count
                         status_text.success("✅ 파이프라인 완료!")
                         st.success("🎉 월별 파이프라인 처리 완료!")
                         
-                        # 결과 표시
-                        month_dir = Path(f"artifacts/incremental/{selected_year}{selected_month:02d}")
-                        summary_file = month_dir / f"summary_{selected_year}{selected_month:02d}.json"
+                        # 결과 표시 (자동 감지된 년/월 사용)
+                        month_dir = Path(f"artifacts/incremental/{detected_year}{detected_month:02d}")
+                        summary_file = month_dir / f"summary_{detected_year}{detected_month:02d}.json"
                         
                         if summary_file.exists():
                             with open(summary_file, 'r', encoding='utf-8') as f:
@@ -680,8 +671,20 @@ count
 with tab3:
     st.header("📈 처리 결과")
     
+    # 년/월 선택
+    col_date1, col_date2, col_date3 = st.columns([1, 1, 2])
+    with col_date1:
+        current_year = datetime.now().year
+        view_year = st.selectbox("연도", range(2024, current_year + 2), key="view_year")
+    with col_date2:
+        view_month = st.selectbox("월", range(1, 13), key="view_month")
+    with col_date3:
+        st.info(f"**조회 대상 월:** {view_year}-{view_month:02d}")
+    
+    month_key = f"{view_year}-{view_month:02d}"
+    
     # 월별 결과 디렉토리
-    month_dir = Path(f"artifacts/incremental/{selected_year}{selected_month:02d}")
+    month_dir = Path(f"artifacts/incremental/{view_year}{view_month:02d}")
     
     if month_dir.exists():
         st.success(f"✅ {month_key} 처리 결과 존재")
@@ -710,7 +713,7 @@ with tab3:
                             st.json(data)
             
             # 예측-실측 비교 파일 있으면 시각화
-            predict_vs_actual = month_dir / f"predict_vs_actual_{selected_year}{selected_month:02d}.csv"
+            predict_vs_actual = month_dir / f"predict_vs_actual_{view_year}{view_month:02d}.csv"
             if predict_vs_actual.exists():
                 st.markdown("---")
                 st.subheader("📊 예측 vs 실측 비교")
@@ -730,7 +733,12 @@ with tab3:
                 
                 # 상위 오차 시리즈
                 st.markdown("**상위 오차 시리즈 (Top 10)**")
-                top_errors = df_compare.nlargest(10, 'abs_error')[['series_id', 'week', 'claim_count', 'y_pred', 'error', 'abs_error']]
+                # month 컬럼이 있으면 사용, 없으면 제외
+                display_cols = ['series_id']
+                if 'month' in df_compare.columns:
+                    display_cols.append('month')
+                display_cols.extend(['claim_count', 'y_pred', 'error', 'abs_error'])
+                top_errors = df_compare.nlargest(10, 'abs_error')[display_cols]
                 st.dataframe(top_errors, width='stretch')
         else:
             st.info("파일이 없습니다.")
@@ -741,11 +749,23 @@ with tab3:
 with tab4:
     st.header("🔧 Reconcile 보정")
     
-    month_dir = Path(f"artifacts/incremental/{selected_year}{selected_month:02d}")
-    reconcile_dir = Path(f"artifacts/reconcile/{selected_year}{selected_month:02d}")
+    # 년/월 선택
+    col_date1, col_date2, col_date3 = st.columns([1, 1, 2])
+    with col_date1:
+        current_year = datetime.now().year
+        reconcile_year = st.selectbox("연도", range(2024, current_year + 2), key="reconcile_year")
+    with col_date2:
+        reconcile_month = st.selectbox("월", range(1, 13), key="reconcile_month")
+    with col_date3:
+        st.info(f"**Reconcile 대상 월:** {reconcile_year}-{reconcile_month:02d}")
+    
+    month_key = f"{reconcile_year}-{reconcile_month:02d}"
+    
+    month_dir = Path(f"artifacts/incremental/{reconcile_year}{reconcile_month:02d}")
+    reconcile_dir = Path(f"artifacts/reconcile/{reconcile_year}{reconcile_month:02d}")
     
     # 처리 결과 확인
-    predict_vs_actual = month_dir / f"predict_vs_actual_{selected_year}{selected_month:02d}.csv"
+    predict_vs_actual = month_dir / f"predict_vs_actual_{reconcile_year}{reconcile_month:02d}.csv"
     
     if predict_vs_actual.exists():
         st.success(f"✅ {month_key} 처리 결과 존재")
@@ -763,22 +783,24 @@ with tab4:
         # Bias 계산
         bias = df_compare['error'].mean() / df_compare['claim_count'].mean() if df_compare['claim_count'].mean() > 0 else np.nan
         
+        # KPI 통과 여부 계산
+        mape_pass = mape < 0.20 if not np.isnan(mape) else False
+        bias_pass = abs(bias) < 0.05 if not np.isnan(bias) else False
+        kpi_pass = mape_pass and bias_pass
+        
         st.subheader("📊 현재 KPI")
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            mape_pass = mape < 0.20 if not np.isnan(mape) else False
             st.metric("MAPE", f"{mape:.2%}", delta=f"목표: <20%", delta_color="inverse" if not mape_pass else "normal")
         
         with col2:
-            bias_pass = abs(bias) < 0.05 if not np.isnan(bias) else False
             st.metric("|Bias|", f"{abs(bias):.4f}", delta=f"목표: <0.05", delta_color="inverse" if not bias_pass else "normal")
         
         with col3:
             st.metric("MAE", f"{df_compare['abs_error'].mean():.2f}")
         
         with col4:
-            kpi_pass = mape_pass and bias_pass
             if kpi_pass:
                 st.success("✅ KPI 통과")
             else:
@@ -826,8 +848,8 @@ with tab4:
                 
                 cmd = [
                     sys.executable, "reconcile_pipeline.py",
-                    "--year", str(selected_year),
-                    "--month", str(selected_month),
+                    "--year", str(reconcile_year),
+                    "--month", str(reconcile_month),
                     "--stage", stage
                 ]
                 
@@ -855,7 +877,7 @@ with tab4:
                     st.success("🎉 Reconcile 보정 완료!")
                     
                     # 결과 표시
-                    summary_file = reconcile_dir / f"reconcile_summary_{selected_year}{selected_month:02d}.json"
+                    summary_file = reconcile_dir / f"reconcile_summary_{reconcile_year}{reconcile_month:02d}.json"
                     
                     if summary_file.exists():
                         with open(summary_file, 'r', encoding='utf-8') as f:

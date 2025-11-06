@@ -3,1129 +3,788 @@
   "plant": "상신(2공장_튀김)",
   "product_cat2": "까스류",
   "mid_category": "동물성이물",
-  "records": 159,
-  "non_zero_records": 21,
-  "total_claims": 22.0,
-  "mean_claims": 0.13836477987421383,
-  "max_claims": 2.0,
-  "quality_stats": {
-    "normal_ratio": 0.9937106918238994,
-    "borderline_ratio": 0.006289308176100629,
-    "mean_sample_weight": 0.9984276729559748
-  },
+  "total_claims": 23.0,
+  "updated_at": "2025-11-06T17:23:02.917755",
   "data": [
     {
-      "year": 2021,
-      "week": 1,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "year": 2011,
+      "month": 1,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2011,
+      "month": 2,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2011,
+      "month": 3,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2011,
+      "month": 4,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2011,
+      "month": 5,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2011,
+      "month": 6,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2011,
+      "month": 7,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2011,
+      "month": 8,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2011,
+      "month": 9,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2011,
+      "month": 10,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2011,
+      "month": 11,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2011,
+      "month": 12,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2012,
+      "month": 1,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2012,
+      "month": 2,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2012,
+      "month": 3,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2012,
+      "month": 4,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2012,
+      "month": 5,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2012,
+      "month": 6,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2012,
+      "month": 7,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2012,
+      "month": 8,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2012,
+      "month": 9,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2012,
+      "month": 10,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2012,
+      "month": 11,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2012,
+      "month": 12,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2013,
+      "month": 1,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2013,
+      "month": 2,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2013,
+      "month": 3,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2013,
+      "month": 4,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2013,
+      "month": 5,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2013,
+      "month": 6,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2013,
+      "month": 7,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2013,
+      "month": 8,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2013,
+      "month": 9,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2013,
+      "month": 10,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2013,
+      "month": 11,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2013,
+      "month": 12,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2014,
+      "month": 1,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2014,
+      "month": 2,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2014,
+      "month": 3,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2014,
+      "month": 4,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2014,
+      "month": 5,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2014,
+      "month": 6,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2014,
+      "month": 7,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2014,
+      "month": 8,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2014,
+      "month": 9,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2014,
+      "month": 10,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2014,
+      "month": 11,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2014,
+      "month": 12,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2015,
+      "month": 1,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2015,
+      "month": 2,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2015,
+      "month": 3,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2015,
+      "month": 4,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2015,
+      "month": 5,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2015,
+      "month": 6,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2015,
+      "month": 7,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2015,
+      "month": 8,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2015,
+      "month": 9,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2015,
+      "month": 10,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2015,
+      "month": 11,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2015,
+      "month": 12,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2016,
+      "month": 1,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2016,
+      "month": 2,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2016,
+      "month": 3,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2016,
+      "month": 4,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2016,
+      "month": 5,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2016,
+      "month": 6,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2016,
+      "month": 7,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2016,
+      "month": 8,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2016,
+      "month": 9,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2016,
+      "month": 10,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2016,
+      "month": 11,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2016,
+      "month": 12,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2017,
+      "month": 1,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2017,
+      "month": 2,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2017,
+      "month": 3,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2017,
+      "month": 4,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2017,
+      "month": 5,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2017,
+      "month": 6,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2017,
+      "month": 7,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2017,
+      "month": 8,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2017,
+      "month": 9,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2017,
+      "month": 10,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2017,
+      "month": 11,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2017,
+      "month": 12,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2018,
+      "month": 1,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2018,
+      "month": 2,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2018,
+      "month": 3,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2018,
+      "month": 4,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2018,
+      "month": 5,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2018,
+      "month": 6,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2018,
+      "month": 7,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2018,
+      "month": 8,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2018,
+      "month": 9,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2018,
+      "month": 10,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2018,
+      "month": 11,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2018,
+      "month": 12,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2019,
+      "month": 1,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2019,
+      "month": 2,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2019,
+      "month": 3,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2019,
+      "month": 4,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2019,
+      "month": 5,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2019,
+      "month": 6,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2019,
+      "month": 7,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2019,
+      "month": 8,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2019,
+      "month": 9,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2019,
+      "month": 10,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2019,
+      "month": 11,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2019,
+      "month": 12,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2020,
+      "month": 1,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2020,
+      "month": 2,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2020,
+      "month": 3,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2020,
+      "month": 4,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2020,
+      "month": 5,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2020,
+      "month": 6,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2020,
+      "month": 7,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2020,
+      "month": 8,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2020,
+      "month": 9,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2020,
+      "month": 10,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2020,
+      "month": 11,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2020,
+      "month": 12,
+      "claim_count": 0.0
     },
     {
       "year": 2021,
-      "week": 2,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 1,
+      "claim_count": 0.0
     },
     {
       "year": 2021,
-      "week": 3,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 2,
+      "claim_count": 0.0
     },
     {
       "year": 2021,
-      "week": 4,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 3,
+      "claim_count": 1.0
     },
     {
       "year": 2021,
-      "week": 5,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 4,
+      "claim_count": 0.0
     },
     {
       "year": 2021,
-      "week": 6,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 5,
+      "claim_count": 1.0
     },
     {
       "year": 2021,
-      "week": 7,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 6,
+      "claim_count": 0.0
     },
     {
       "year": 2021,
-      "week": 8,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 7,
+      "claim_count": 0.0
     },
     {
       "year": 2021,
-      "week": 9,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 8,
+      "claim_count": 2.0
     },
     {
       "year": 2021,
-      "week": 10,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 9,
+      "claim_count": 1.0
     },
     {
       "year": 2021,
-      "week": 11,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 10,
+      "claim_count": 0.0
     },
     {
       "year": 2021,
-      "week": 12,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 11,
+      "claim_count": 2.0
     },
     {
       "year": 2021,
-      "week": 13,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 14,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 15,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 16,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 17,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 18,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 19,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 20,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 21,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 22,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 23,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 24,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 25,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 26,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 27,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 28,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 29,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 30,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 31,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 32,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 33,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 34,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 35,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 36,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 37,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 38,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 39,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 40,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 41,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 42,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 43,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 44,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 45,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 46,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 47,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 48,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 49,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 50,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 51,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 52,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2021,
-      "week": 53,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 12,
+      "claim_count": 2.0
     },
     {
       "year": 2022,
-      "week": 1,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 1,
+      "claim_count": 0.0
     },
     {
       "year": 2022,
-      "week": 2,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 2,
+      "claim_count": 0.0
     },
     {
       "year": 2022,
-      "week": 3,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 3,
+      "claim_count": 2.0
     },
     {
       "year": 2022,
-      "week": 4,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 4,
+      "claim_count": 0.0
     },
     {
       "year": 2022,
-      "week": 5,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 5,
+      "claim_count": 1.0
     },
     {
       "year": 2022,
-      "week": 6,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 6,
+      "claim_count": 0.0
     },
     {
       "year": 2022,
-      "week": 7,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 7,
+      "claim_count": 1.0
     },
     {
       "year": 2022,
-      "week": 8,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 8,
+      "claim_count": 0.0
     },
     {
       "year": 2022,
-      "week": 9,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 9,
+      "claim_count": 1.0
     },
     {
       "year": 2022,
-      "week": 10,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 10,
+      "claim_count": 1.0
     },
     {
       "year": 2022,
-      "week": 11,
-      "claim_count": 2,
-      "lag_class": "borderline",
-      "sample_weight": 0.75
+      "month": 11,
+      "claim_count": 1.0
     },
     {
       "year": 2022,
-      "week": 12,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 13,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 14,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 15,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 16,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 17,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 18,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 19,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 20,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 21,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 22,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 23,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 24,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 25,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 26,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 27,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 28,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 29,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 30,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 31,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 32,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 33,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 34,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 35,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 36,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 37,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 38,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 39,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 40,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 41,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 42,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 43,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 44,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 45,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 46,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 47,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 48,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 49,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 50,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 51,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 52,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2022,
-      "week": 53,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 12,
+      "claim_count": 2.0
     },
     {
       "year": 2023,
-      "week": 1,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 1,
+      "claim_count": 1.0
     },
     {
       "year": 2023,
-      "week": 2,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 2,
+      "claim_count": 0.0
     },
     {
       "year": 2023,
-      "week": 3,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 3,
+      "claim_count": 0.0
     },
     {
       "year": 2023,
-      "week": 4,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 4,
+      "claim_count": 2.0
     },
     {
       "year": 2023,
-      "week": 5,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 5,
+      "claim_count": 0.0
     },
     {
       "year": 2023,
-      "week": 6,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 6,
+      "claim_count": 0.0
     },
     {
       "year": 2023,
-      "week": 7,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 7,
+      "claim_count": 0.0
     },
     {
       "year": 2023,
-      "week": 8,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 8,
+      "claim_count": 0.0
     },
     {
       "year": 2023,
-      "week": 9,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 9,
+      "claim_count": 0.0
     },
     {
       "year": 2023,
-      "week": 10,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 10,
+      "claim_count": 0.0
     },
     {
       "year": 2023,
-      "week": 11,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 11,
+      "claim_count": 2.0
     },
     {
       "year": 2023,
-      "week": 12,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 13,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 14,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 15,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 16,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 17,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 18,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 19,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 20,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 21,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 22,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 23,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 24,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 25,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 26,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 27,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 28,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 29,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 30,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 31,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 32,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 33,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 34,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 35,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 36,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 37,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 38,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 39,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 40,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 41,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 42,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 43,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 44,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 45,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 46,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 47,
-      "claim_count": 1,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 48,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 49,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 50,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 51,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 52,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
-    },
-    {
-      "year": 2023,
-      "week": 53,
-      "claim_count": 0,
-      "lag_class": "normal",
-      "sample_weight": 1.0
+      "month": 12,
+      "claim_count": 0.0
     }
   ]
 }

@@ -1,148 +1,144 @@
+# -*- coding: utf-8 -*-
 """
-월별 증분학습 파이프라인
-1. 월별 데이터 업로드 (발생일자 기준)
-2. Lag 필터링 (Normal-Lag만 학습)
-3. 기존 예측과 비교
-4. 모델 재학습 (append_fit)
-5. 결과 기록
+Incremental monthly update process
 """
-import pandas as pd
+import argparse
 import json
 from pathlib import Path
+import pandas as pd
 from datetime import datetime
-import argparse
 import sys
 
-# 로컬 모듈 임포트
-from tools.filter_monthly_data import filter_monthly_data
-from tools.compare_forecast_actual import compare_forecast_vs_actual
+sys.path.insert(0, str(Path(__file__).parent))
+from src.preprocess import monthly_agg_from_counts
 
-def process_monthly_data(
-    upload_file: str,
-    year: int,
-    month: int,
-    lag_stats_path: str = "artifacts/metrics/lag_stats_from_raw.csv",
-    base_models_dir: str = "artifacts/models/base_2021_2023",
-    output_dir: str = "artifacts/incremental"
-):
-    """
-    월별 데이터 처리 및 증분학습
+def append_new_month(master_df, csv_path, year, month):
+    df_new = pd.read_csv(csv_path, encoding='utf-8-sig')
+    print(f"  Raw records: {len(df_new):,}")
     
-    Parameters:
-    -----------
-    upload_file : str
-        업로드된 월별 데이터 CSV 경로
-    year : int
-        대상 연도 (예: 2024)
-    month : int
-        대상 월 (1-12)
-    """
-    
-    print("=" * 80)
-    print(f"월별 증분학습 파이프라인: {year}-{month:02d}")
-    print("=" * 80)
-    
-    # Step 1: 업로드 데이터 로드
-    print(f"\n[Step 1] 데이터 로드: {upload_file}")
-    df_upload = pd.read_csv(upload_file, encoding='utf-8')
-    print(f"  원본 레코드: {len(df_upload):,}건")
-    
-    # Step 2: Lag 필터링
-    print(f"\n[Step 2] Lag 필터링 (Normal-Lag만 학습)")
-    filter_stats = filter_monthly_data(
-        input_csv=upload_file,
-        year=year,
-        month=month,
-        lag_stats_path=lag_stats_path,
-        output_dir=output_dir
-    )
-    
-    # Step 3: 기존 예측 로드 및 비교
-    print(f"\n[Step 3] 예측-실측 비교")
-    forecast_file = f"artifacts/forecasts/{year}/forecast_{year}_{month:02d}.parquet"
-    
-    if Path(forecast_file).exists():
-        series_metrics = compare_forecast_vs_actual(
-            actual_file=filter_stats['candidates_file'],
-            forecast_file=forecast_file,
-            year=year,
-            month=month,
-            output_dir="logs"
-        )
-    else:
-        print(f"  ⚠️ 예측 파일 없음: {forecast_file}")
-        print(f"  → 예측 없이 학습만 진행")
-        series_metrics = {}
-    
-    # Step 4: KPI 게이트 체크
-    print(f"\n[Step 4] KPI 게이트 체크")
-    kpi_pass = True
-    if series_metrics:
-        import numpy as np
-        valid_mapes = [m['MAPE'] for m in series_metrics.values() if m['MAPE'] is not None]
-        valid_bias = [abs(m['Bias']) for m in series_metrics.values() if m['Bias'] is not None]
-        
-        if valid_mapes:
-            avg_mape = np.mean(valid_mapes)
-            print(f"  평균 MAPE: {avg_mape:.2f}% (목표: <20%)")
-            if avg_mape > 20:
-                kpi_pass = False
-        
-        if valid_bias:
-            avg_bias = np.mean(valid_bias)
-            print(f"  평균 |Bias|: {avg_bias:.4f} (목표: <0.05)")
-            if avg_bias > 0.05:
-                kpi_pass = False
-        
-        if kpi_pass:
-            print(f"  ✅ KPI 통과")
-        else:
-            print(f"  ⚠️ KPI 미달 - Reconcile 필요")
-    
-    # Step 5: 모델 재학습 (append_fit)
-    print(f"\n[Step 5] 모델 재학습 (Append Fit)")
-    print(f"  TODO: append_fit 구현 예정")
-    print(f"  학습 후보: {filter_stats['normal'] + filter_stats['borderline']:,}건")
-    
-    # Step 6: 결과 기록
-    print(f"\n[Step 6] 결과 저장")
-    log_dir = Path("logs/incremental")
-    log_dir.mkdir(parents=True, exist_ok=True)
-    
-    summary = {
-        'year': year,
-        'month': month,
-        'timestamp': datetime.now().isoformat(),
-        'filter_stats': filter_stats,
-        'kpi_pass': kpi_pass,
-        'series_count': len(series_metrics),
-        'forecast_file': forecast_file,
-        'candidates_file': filter_stats['candidates_file']
+    # 컬럼명 매핑 (업로드 CSV → 내부 형식)
+    column_mapping = {
+        '발생일자': 'occurrence_date',  # 발생일자는 사용 안 하지만 매핑
+        '중분류(보정)': 'mid_category',
+        '플랜트': 'plant',
+        '제품범주2': 'product_cat2',
+        '제조일자': 'manufacturing_date',
+        'count': 'claim_count'
     }
     
-    log_file = log_dir / f"summary_{year}_{month:02d}.json"
-    with open(log_file, 'w', encoding='utf-8') as f:
-        json.dump(summary, f, ensure_ascii=False, indent=2)
+    # 실제 존재하는 컬럼만 rename
+    rename_dict = {k: v for k, v in column_mapping.items() if k in df_new.columns}
+    df_new = df_new.rename(columns=rename_dict)
     
-    print(f"  ✅ 요약 저장: {log_file}")
+    # 디버깅: 매핑 후 샘플 데이터 출력
+    print(f"  Columns after mapping: {df_new.columns.tolist()}")
+    print(f"  Sample data (first 3 rows):")
+    print(f"    {df_new[['plant', 'product_cat2', 'mid_category', 'manufacturing_date']].head(3).to_dict('records')}")
     
-    print("\n" + "=" * 80)
-    print("✅ 월별 증분학습 완료!")
-    print("=" * 80)
+    # 제조일자가 이미 YYYY-MM-DD 형식이므로 그대로 사용
+    # monthly_agg_from_counts에 명시적으로 date_col 전달
+    
+    # 영어 컬럼명으로 group_cols 명시
+    df_monthly = monthly_agg_from_counts(
+        df_new, 
+        date_col='manufacturing_date',  # 매핑된 컬럼명 사용
+        value_col='claim_count',
+        group_cols=['plant', 'product_cat2', 'mid_category'],  # 영어 컬럼명
+        min_claims=0, 
+        pad_to_date=(year, month)
+    )
+    
+    print(f"  Aggregated series: {df_monthly['series_id'].nunique()}")
+    print(f"  Aggregated rows: {len(df_monthly)}")
+    df_monthly = df_monthly[(df_monthly['year'] == year) & (df_monthly['month'] == month)].copy()
+    
+    if not master_df.empty:
+        master_df = master_df[~((master_df['year'] == year) & (master_df['month'] == month))].copy()
+        updated_df = pd.concat([master_df, df_monthly], ignore_index=True)
+    else:
+        updated_df = df_monthly
+    
+    return updated_df.sort_values(['series_id', 'year', 'month']).reset_index(drop=True)
 
+def update_json(series_id, series_df, json_dir):
+    safe_name = series_id.replace('/', '_').replace('\\', '_').replace(':', '_').replace('|', '_')
+    json_path = json_dir / f"{safe_name}.json"
+    
+    info = {
+        "series_id": series_id,
+        "plant": series_df['plant'].iloc[0],
+        "product_cat2": series_df['product_cat2'].iloc[0],
+        "mid_category": series_df['mid_category'].iloc[0],
+        "total_claims": float(series_df['claim_count'].sum()),
+        "updated_at": datetime.now().isoformat(),
+        "data": series_df[['year', 'month', 'claim_count']].sort_values(['year', 'month']).to_dict(orient='records')
+    }
+    
+    action = 'updated' if json_path.exists() else 'created'
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(info, f, ensure_ascii=False, indent=2)
+    return action
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="월별 증분학습 파이프라인")
-    parser.add_argument("--upload", type=str, required=True,
-                        help="업로드된 월별 데이터 CSV")
-    parser.add_argument("--year", type=int, required=True,
-                        help="대상 연도 (예: 2024)")
-    parser.add_argument("--month", type=int, required=True,
-                        help="대상 월 (1-12)")
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--new-csv", required=True)
+    parser.add_argument("--year", type=int, required=True)
+    parser.add_argument("--month", type=int, required=True)
+    parser.add_argument("--master-parquet", default="data/curated/claims_monthly.parquet")
+    parser.add_argument("--json-dir", default="data/features")
+    parser.add_argument("--min-claims", type=int, default=10)
+    parser.add_argument("--output-list", default=None)
     args = parser.parse_args()
     
-    process_monthly_data(
-        upload_file=args.upload,
-        year=args.year,
-        month=args.month
-    )
+    print("=" * 80)
+    print(f"Incremental Update: {args.year}-{args.month:02d}")
+    print("=" * 80)
+    
+    # Load master
+    master_path = Path(args.master_parquet)
+    if master_path.exists():
+        master_df = pd.read_parquet(master_path)
+        print(f"[INFO] Master loaded: {len(master_df)} rows")
+    else:
+        master_df = pd.DataFrame()
+    
+    # Append new month
+    print(f"\n[INFO] Processing {args.new_csv}")
+    updated_df = append_new_month(master_df, args.new_csv, args.year, args.month)
+    
+    # Save
+    updated_df.to_parquet(master_path, index=False)
+    print(f"[SUCCESS] Updated: {len(updated_df)} rows, {updated_df['series_id'].nunique()} series")
+    
+    # Filter viable series
+    totals = updated_df.groupby('series_id')['claim_count'].sum().reset_index()
+    totals.columns = ['series_id', 'total_claims']
+    viable = totals[totals['total_claims'] >= args.min_claims]
+    print(f"\n[INFO] Viable series (>={args.min_claims}): {len(viable)}/{len(totals)}")
+    
+    # Update JSON
+    json_dir = Path(args.json_dir)
+    json_dir.mkdir(parents=True, exist_ok=True)
+    
+    created, updated_list = 0, []
+    for idx, row in viable.iterrows():
+        series_id = row['series_id']
+        series_df = updated_df[updated_df['series_id'] == series_id]
+        action = update_json(series_id, series_df, json_dir)
+        if action == 'created':
+            created += 1
+            print(f"  [NEW] {series_id}")
+        updated_list.append(series_id)
+    
+    print(f"\n[SUCCESS] JSON updates: {created} created, {len(updated_list)} total")
+    
+    # Save list
+    if args.output_list:
+        Path(args.output_list).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.output_list).write_text('\n'.join(updated_list), encoding='utf-8')
+        print(f"[INFO] List saved: {args.output_list}")
+    
+    return 0
+
+if __name__ == '__main__':
+    exit(main())

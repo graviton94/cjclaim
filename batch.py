@@ -52,9 +52,15 @@ def main():
 
     args = parser.parse_args()
 
-    from pipeline_train import train_until
-    from pipeline_forecast import forecast_year
-    from pipeline_reconcile import reconcile_year
+    # process와 retrain은 별도의 스크립트를 호출하므로 import 불필요
+    if args.command in ["process", "retrain"]:
+        pass  # 아래에서 subprocess로 실행
+    else:
+        # 기존 파이프라인용 import (주간 기반)
+        from pipeline_train import train_until
+        from pipeline_forecast import forecast_year
+        from pipeline_reconcile import reconcile_year
+    
     curated = Path("data/curated/claims.parquet")
 
     if args.command == "train":
@@ -132,19 +138,20 @@ def main():
     elif args.command == "process":
         # 월별 증분학습 파이프라인
         print("=" * 80)
-        print("월별 데이터 처리 (Full Pipeline)")
+        print("월별 데이터 처리 (Incremental Update)")
         print("=" * 80)
         
         year, month = args.month.split('-')
         print(f"\n입력 파일: {args.upload}")
         print(f"대상 월: {year}년 {month}월")
         
-        # process_monthly_data.py 실행
+        # process_monthly_incremental.py 실행
         cmd = [
-            sys.executable, "process_monthly_data.py",
-            "--input", args.upload,
+            sys.executable, "process_monthly_incremental.py",
+            "--new-csv", args.upload,
             "--year", year,
-            "--month", month
+            "--month", month,
+            "--output-list", f"artifacts/temp/updated_series_{year}{month}.txt"
         ]
         
         print(f"\n명령: {' '.join(cmd)}")
@@ -152,23 +159,8 @@ def main():
         
         if result.returncode == 0:
             print("\n" + "=" * 80)
-            print("✅ 월별 파이프라인 완료!")
+            print("[SUCCESS] Monthly incremental update completed!")
             print("=" * 80)
-            
-            # 결과 요약 표시
-            summary_file = Path(f"artifacts/incremental/{year}{month}/summary_{year}{month}.json")
-            if summary_file.exists():
-                with open(summary_file, 'r', encoding='utf-8') as f:
-                    summary = json.load(f)
-                
-                print("\n📊 처리 결과:")
-                print(f"  시간: {summary.get('processed_at', 'N/A')}")
-                print(f"  총 레코드: {summary.get('total_records', 0):,}건")
-                print(f"  시리즈 수: {summary.get('series_count', 0):,}개")
-                if summary.get('mean_error') is not None:
-                    print(f"  평균 오차: {summary['mean_error']:.2f}")
-                if summary.get('mae') is not None:
-                    print(f"  MAE: {summary['mae']:.2f}")
         
         sys.exit(result.returncode)
     

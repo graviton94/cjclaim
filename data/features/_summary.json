@@ -1,9 +1,9 @@
 {
-  "total_series": 2613,
-  "created_files": 2481,
-  "skipped_series": 132,
-  "min_records_threshold": 1,
-  "has_quality_metadata": true,
-  "input_file": "data/curated/weekly_timeseries_2021_2023.parquet",
+  "total_series": 337,
+  "created_files": 219,
+  "skipped_series": 118,
+  "min_records_threshold": 10,
+  "has_quality_metadata": false,
+  "input_file": "data/curated/claims_monthly.parquet",
   "output_directory": "data\\features"
 }

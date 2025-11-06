@@ -9,7 +9,7 @@ from datetime import datetime
 from src.forecasting import safe_forecast
 
 # 경로 설정
-CURATED_PATH = "data/curated/claims_base_2021_2023.parquet"
+CURATED_PATH = "data/curated/claims_monthly.parquet"
 FEATURES_PATH = "data/features/cycle_features.parquet"
 ARTIFACTS_DIR = "artifacts"
 

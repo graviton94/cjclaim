@@ -126,9 +126,9 @@ def forecast_single_series(args_tuple):
 def generate_monthly_forecast(
     year: int,
     month: int,
-    models_dir: str = "artifacts/models/base_2021_2023",
+    models_dir: str = "artifacts/models/base_monthly",
     output_dir: str = None,
-    horizon: int = 8,  # 다음 8주 (약 2개월)
+    horizon: int = 26,  # 다음 26주 (6개월)
     max_workers: int = 4
 ):
     """
@@ -184,6 +184,7 @@ def generate_monthly_forecast(
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(forecast_single_series, task): task for task in tasks}
         
+        errors = []
         for i, future in enumerate(as_completed(futures), 1):
             result = future.result()
             
@@ -192,6 +193,7 @@ def generate_monthly_forecast(
                 success_count += 1
             else:
                 error_count += 1
+                errors.append(result)
             
             if i % 100 == 0:
                 print(f"  진행: {i}/{len(tasks)} ({i/len(tasks)*100:.1f}%) - "
@@ -201,6 +203,12 @@ def generate_monthly_forecast(
     print(f"  성공: {success_count:,}개")
     print(f"  실패: {error_count:,}개")
     print(f"  총 예측 레코드: {len(all_forecasts):,}개")
+    
+    # 에러 샘플 출력
+    if errors:
+        print(f"\n❌ 실패 샘플 (처음 5개):")
+        for err in errors[:5]:
+            print(f"  - {err.get('series_id', 'unknown')}: {err.get('error', 'unknown error')}")
     
     if not all_forecasts:
         print("  ⚠️  예측 결과 없음")
@@ -233,10 +241,10 @@ def main():
     parser = argparse.ArgumentParser(description="월별 예측 생성 파이프라인")
     parser.add_argument("--year", type=int, required=True, help="연도")
     parser.add_argument("--month", type=int, required=True, help="월")
-    parser.add_argument("--models-dir", type=str, default="artifacts/models/base_2021_2023",
-                       help="모델 디렉토리")
+    parser.add_argument("--models-dir", type=str, default="artifacts/models/base_monthly",
+                        help="모델 디렉토리")
     parser.add_argument("--output-dir", type=str, help="출력 디렉토리 (기본: artifacts/forecasts/YYYY/)")
-    parser.add_argument("--horizon", type=int, default=8, help="예측 주차 수")
+    parser.add_argument("--horizon", type=int, default=26, help="예측 주차 수 (기본: 26주 = 6개월)")
     parser.add_argument("--max-workers", type=int, default=4, help="병렬 worker 수")
     
     args = parser.parse_args()

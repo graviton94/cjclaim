@@ -9,7 +9,7 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser(description="Convert curated parquet to series-level JSON files")
-    parser.add_argument("--input", type=str, default="data/curated/weekly_timeseries_2021_2023.parquet",
+    parser.add_argument("--input", type=str, default="data/curated/claims_monthly.parquet",
                         help="Input curated parquet path")
     parser.add_argument("--output-dir", type=str, default="data/features",
                         help="Output directory for JSON files")
@@ -71,15 +71,15 @@ def main():
                 "mean_sample_weight": float(series_df['sample_weight'].mean()),
             }
         
-        # 시계열 데이터 (year, week, claim_count, 선택적으로 quality metadata)
-        timeseries = series_df[['year', 'week', 'claim_count']].copy()
+        # 시계열 데이터 (year, month, claim_count, 선택적으로 quality metadata)
+        timeseries = series_df[['year', 'month', 'claim_count']].copy()
         
         if has_quality_meta:
             timeseries['lag_class'] = series_df['lag_class']
             timeseries['sample_weight'] = series_df['sample_weight']
         
         # 정렬 및 변환
-        timeseries = timeseries.sort_values(['year', 'week'])
+        timeseries = timeseries.sort_values(['year', 'month'])
         series_info["data"] = timeseries.to_dict(orient='records')
         
         # JSON 파일 저장 (안전한 파일명 - Windows 금지 문자 제거)
