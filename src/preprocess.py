@@ -6,14 +6,28 @@ from itertools import product
 
 GROUP_COLS = ["플랜트", "제품범주2", "중분류"]
 
-def create_complete_yearweek_grid(df: pd.DataFrame, pad_to_date: pd.Timestamp) -> pd.DataFrame:
-    """전체 연도-주차 그리드 생성"""
+def create_complete_yearweek_grid(df: pd.DataFrame, pad_to: tuple) -> pd.DataFrame:
+    """
+    전체 연도-주차 그리드 생성
+    
+    Args:
+        df: 데이터프레임 (year, week 컬럼 필요)
+        pad_to: (year, week) 튜플로 마지막 연도-주차 지정
+    
+    Returns:
+        year, week 컬럼을 가진 데이터프레임
+    """
     min_year = df['year'].min()
-    max_year = pd.Timestamp(pad_to_date).year
-    weeks = range(1, 54)  # 1-53주
+    max_year, max_week = pad_to
     
     # 모든 연도-주차 조합 생성
-    year_weeks = list(product(range(min_year, max_year + 1), weeks))
+    year_weeks = []
+    for year in range(min_year, max_year + 1):
+        # 마지막 연도는 max_week까지만
+        end_week = max_week if year == max_year else 53
+        for week in range(1, end_week + 1):
+            year_weeks.append((year, week))
+    
     return pd.DataFrame(year_weeks, columns=['year', 'week'])
 
 def generate_series_keys(df: pd.DataFrame, group_cols: List[str]) -> pd.DataFrame:
@@ -28,7 +42,7 @@ def weekly_agg_from_counts(
     date_col: str = "제조일자",
     value_col: str = "count",
     group_cols: List[str] = GROUP_COLS,
-    pad_to_date: pd.Timestamp = None
+    pad_to_date: tuple = None
 ) -> pd.DataFrame:
     """
     원본 데이터를 주간 단위로 집계하고 패딩을 적용
@@ -38,7 +52,7 @@ def weekly_agg_from_counts(
         date_col: 날짜 컬럼명
         value_col: 집계할 값 컬럼명
         group_cols: 그룹화 컬럼 목록
-        pad_to_date: 패딩 종료 날짜
+        pad_to_date: (year, week) 튜플로 패딩 종료 주차 지정
     
     Returns:
         집계 및 패딩된 데이터프레임 (series_id, group_cols, year, week, claim_count)

@@ -1,4 +1,31 @@
-Quality-cycles — Quick start
+Quality-cycles — 품질 클레임 주간 예측 시스템
+
+## 🎯 주요 기능
+
+### 1. Base Training (2021-2023)
+- 2,208개 SARIMAX 모델 학습 (84.7% 성공률)
+- Lag 기반 품질 필터링 (Normal-Lag 정책)
+- 시리즈별 JSON 데이터 관리
+
+### 2. 월별 증분학습 시스템
+- 발생일자 기준 1개월 데이터 처리
+- Lag 필터링 → 주간 집계 → 예측 비교 → 재학습
+- **Warm Start:** start_params로 빠른 수렴 (~75% 시간 절감)
+- **Sample Weights:** Normal=1.0, Borderline=0.5
+- Streamlit UI를 통한 손쉬운 업로드 및 모니터링
+
+### 3. Reconcile 보정 시스템 (3단계)
+- **Stage 1: Bias Map** - 주간 평균 오차 보정 (초 단위)
+- **Stage 2: Seasonal Recalibration** - STL 계절성 재추정 (분 단위)
+- **Stage 3: Optuna Tuning** - 하이퍼파라미터 최적화 (시간 단위)
+- KPI 게이트 자동 체크 (MAPE<20%, |Bias|<0.05)
+
+### 4. 예측 생성 파이프라인
+- 다음 8주 예측 (horizon 조정 가능)
+- 95% 신뢰구간 계산
+- 병렬 처리로 빠른 예측 생성
+
+---
 
 ## 🚀 Setup
 
@@ -28,7 +55,45 @@ python -m streamlit run app.py
 
 ## 📋 Pipeline Commands
 
-### Training Pipeline
+### Base Training
+
+```powershell
+# 2021-2023 Base 학습
+python batch.py train --mode base --workers 4
+```
+
+### 월별 증분학습 (완전 자동화)
+
+```powershell
+# 1단계: 월별 데이터 처리
+python batch.py process --upload data/claims_202401.csv --month 2024-01
+
+# 2단계: KPI 체크 및 Reconcile (필요 시)
+python batch.py reconcile --month-new 2024-01 --stage-new all
+
+# 3단계: 증분 재학습 (Warm Start)
+python batch.py retrain --month 2024-01 --workers 4
+
+# 4단계: 다음 월 예측 생성
+python batch.py forecast --month-new 2024-02
+
+# ✨ Streamlit UI로 손쉽게 (권장)
+streamlit run app_incremental.py
+```
+
+### Reconcile 보정
+
+```powershell
+# 전체 단계 실행 (Bias Map → Seasonal → Optuna)
+python batch.py reconcile --month-new 2024-01 --stage-new all
+
+# 특정 단계만 실행
+python batch.py reconcile --month-new 2024-01 --stage-new bias
+python batch.py reconcile --month-new 2024-01 --stage-new seasonal
+python batch.py reconcile --month-new 2024-01 --stage-new optuna
+```
+
+### 기존 Pipeline (연도 기반)
 
 ```powershell
 # 특정 연도까지 학습
@@ -73,40 +138,51 @@ python tools/run_optuna.py --candidates artifacts/metrics/tuning_candidates.csv 
 
 ```
 quality-cycles/
-├── app.py                          # Streamlit 웹 앱
-├── batch.py                        # CLI 배치 파이프라인
-├── pipeline_train.py               # 학습 파이프라인
+├── app.py                          # Streamlit 웹 앱 (Base 학습)
+├── app_incremental.py              # Streamlit 증분학습 UI
+├── batch.py                        # CLI 통합 배치 (7개 서브커맨드)
+│
+├── pipeline_train.py               # Base 학습 파이프라인
 ├── pipeline_forecast.py            # 예측 파이프라인
-├── pipeline_reconcile.py           # 보정 파이프라인 (확장됨)
-├── roll_backtest.py               # 롤링 백테스트
+├── pipeline_reconcile.py           # 보정 파이프라인
+├── roll_pipeline.py                # 롤링 백테스트
+│
+├── train_base_models.py            # Base 학습 로직
+├── train_incremental_models.py     # 증분 재학습 (Warm Start)
+├── generate_monthly_forecast.py    # 월별 예측 생성
+├── reconcile_pipeline.py           # 3단계 Reconcile (Bias/Seasonal/Optuna)
+│
+├── preprocess_to_curated.py        # 전처리 (raw → curated)
+├── process_monthly_data.py         # 월별 데이터 처리 (증분학습용)
+├── generate_series_json.py         # 시리즈별 JSON 생성
+├── evaluate_predictions.py         # 예측 평가
 │
 ├── src/
-│   ├── metrics.py                 # 메트릭 계산 (MAPE, MASE, Bias 등)
-│   ├── reconcile.py               # 보정 로직 (Bias, Seasonal, Changepoint)
-│   ├── guards.py                  # 운영 가드라인 (희소도, 드리프트 등)
-│   ├── forecasting.py             # 예측 모델
-│   ├── preprocess.py              # 전처리
-│   └── ...
-│
-├── tools/
-│   ├── validate_baseline.py       # Baseline 검증 도구
-│   └── run_optuna.py              # Optuna 튜닝 도구
+│   ├── changepoint.py             # 변화점 감지
+│   ├── constants.py               # 상수 정의
+│   ├── cycle_features.py          # 주기 특성 추출
+│   ├── forecasting.py             # SARIMAX 예측
+│   ├── io_utils.py                # I/O 유틸리티
+│   ├── preprocess.py              # 전처리 로직
+│   └── scoring.py                 # 메트릭 계산
 │
 ├── data/
 │   ├── raw/                       # 원본 데이터
-│   ├── curated/                   # 전처리된 데이터
+│   ├── curated/                   # 전처리된 데이터 (weekly)
 │   └── features/                  # 피처 데이터
 │
 ├── artifacts/
-│   ├── models/                    # 학습된 모델
-│   ├── forecasts/                 # 예측 결과
-│   ├── metrics/                   # 성능 메트릭
-│   ├── adjustments/               # 보정 파라미터
-│   └── optuna/                    # Optuna 튜닝 결과
+│   ├── models/                    # 학습된 모델 (2,208개 PKL)
+│   ├── forecasts/                 # 예측 결과 (Parquet/CSV)
+│   ├── adjustments/               # Reconcile 보정 파라미터
+│   └── mlruns/                    # MLflow 실험 추적
 │
-├── reports/                       # 보고서 (Markdown)
-├── logs/                          # 실행 로그
-└── configs/                       # 설정 파일
+├── reports/                       # 보고서 (Markdown, 런타임 생성)
+├── logs/                          # 실행 로그 (런타임 생성)
+├── configs/                       # 설정 파일 (config.yaml)
+└── scripts/                       # 유틸리티 스크립트
+
+# 총 15개 핵심 Python 파일 (테스트/검증 파일 34개 제거 완료)
 ```
 
 ---

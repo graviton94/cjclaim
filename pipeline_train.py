@@ -9,12 +9,12 @@ from datetime import datetime
 from src.forecasting import safe_forecast
 
 # 경로 설정
-CURATED_PATH = "data/curated/claims.parquet"
+CURATED_PATH = "data/curated/claims_base_2021_2023.parquet"
 FEATURES_PATH = "data/features/cycle_features.parquet"
 ARTIFACTS_DIR = "artifacts"
 
 # 파라미터 설정
-TRAIN_UNTIL_YEAR = 2024  # 2024년까지 학습
+TRAIN_UNTIL_YEAR = 2023  # 2023년까지 학습
 TRAIN_UNTIL_WEEK = 52    # 52주까지 학습
 FORECAST_HORIZON = 26    # 26주 예측 (6개월)
 SEASONAL_ORDER = (0, 1, 1, 52)  # SARIMA 파라미터
@@ -35,14 +35,32 @@ print(f"Features 데이터: {len(df_features):,} 행, {df_features['series_id'].
 # 2. 학습 데이터 필터링
 print("\n[2] 학습 데이터 필터링")
 print("-" * 80)
-# 학습 기간: 2024년 52주까지
+# 기본 상수로 상한을 정하되, 실제 입력된 데이터의 최대 주차를 사용해 과도한 패딩(W53 등)을 피합니다.
+effective_max_week_for_year = df_curated.loc[df_curated['year'] == TRAIN_UNTIL_YEAR, 'week'].max()
+if pd.isna(effective_max_week_for_year):
+    # 해당 연도 데이터가 없으면 상수값 사용
+    effective_max_week_for_year = TRAIN_UNTIL_WEEK
+else:
+    # 정수로 변환
+    effective_max_week_for_year = int(effective_max_week_for_year)
+
 train_mask = (
     (df_curated['year'] < TRAIN_UNTIL_YEAR) |
-    ((df_curated['year'] == TRAIN_UNTIL_YEAR) & (df_curated['week'] <= TRAIN_UNTIL_WEEK))
+    ((df_curated['year'] == TRAIN_UNTIL_YEAR) & (df_curated['week'] <= effective_max_week_for_year))
 )
 df_train = df_curated[train_mask].copy()
 print(f"학습 데이터: {len(df_train):,} 행")
-print(f"학습 기간: {df_train['year'].min()}-W{df_train['week'].min()} ~ {df_train['year'].max()}-W{df_train['week'].max()}")
+
+# 전역 학습 주(week) 시퀀스 생성 - 이후 각 시리즈는 이 시퀀스를 기준으로 재색인(reindex)하여
+# 누락된 주는 0으로 채웁니다. (요청하신대로 공백 시리즈는 건너뛰지 않고 0으로 카운트됩니다.)
+unique_weeks = (
+    df_train[['year', 'week']]
+    .drop_duplicates()
+    .sort_values(['year', 'week'])
+    .reset_index(drop=True)
+)
+
+print(f"학습 기간: {unique_weeks.iloc[0]['year']}-W{int(unique_weeks.iloc[0]['week'])} ~ {unique_weeks.iloc[-1]['year']}-W{int(unique_weeks.iloc[-1]['week'])}")
 
 # 3. 시리즈별 모델 학습
 print("\n[3] 시리즈별 모델 학습")
@@ -79,10 +97,15 @@ for i, series_id in enumerate(series_list, 1):
         print()  # 새 줄로 이동
     
     # 시리즈 데이터 추출
-    series_data = df_train[df_train['series_id'] == series_id].sort_values(['year', 'week'])
-    
-    # 시계열 생성
-    y = series_data['claim_count'].values
+    series_data = df_train[df_train['series_id'] == series_id][['year', 'week', 'claim_count']]
+    series_data = series_data.sort_values(['year', 'week'])
+
+    # 전역 주(week) 시퀀스에 맞춰 재색인하여 누락된 주는 0으로 채웁니다.
+    series_full = unique_weeks.merge(series_data, on=['year', 'week'], how='left')
+    series_full['claim_count'] = series_full['claim_count'].fillna(0)
+
+    # 시계열 생성 (float 타입 보장)
+    y = series_full['claim_count'].astype(float).values
     
     # 모델 학습 및 예측
     try:
