@@ -22,17 +22,25 @@ def forecast_single_series(args_tuple):
     Parameters:
     -----------
     args_tuple : tuple
-        (series_id, model_path, horizon, year, month)
+        (model_path, horizon, year, month)
     """
-    series_id, model_path, horizon, year, month = args_tuple
+    model_path, horizon, year, month = args_tuple
     
     try:
         # 모델 로드
         with open(model_path, 'rb') as f:
             model_info = pickle.load(f)
         
-        # JSON에서 학습 데이터 로드
-        json_path = Path("data/features") / f"{series_id.replace('/', '_').replace('\\', '_').replace(':', '_').replace('|', '_').replace('?', '_').replace('*', '_').replace('<', '_').replace('>', '_').replace('\"', '_')}.json"
+        # 모델 내부의 series_id 사용 (원본 형태: plant|product|category)
+        series_id = model_info.get('series_id')
+        if not series_id:
+            return {'status': 'error', 'reason': 'series_id not found in model'}
+        
+        # JSON 파일명 생성 (동일한 변환 로직)
+        safe_filename = (series_id.replace('/', '_').replace('\\', '_').replace(':', '_')
+                        .replace('|', '_').replace('?', '_').replace('*', '_')
+                        .replace('<', '_').replace('>', '_').replace('"', '_'))
+        json_path = Path("data/features") / f"{safe_filename}.json"
         
         if not json_path.exists():
             return {'status': 'error', 'reason': f'JSON not found: {json_path}'}
@@ -48,8 +56,9 @@ def forecast_single_series(args_tuple):
         # 2021-2023 데이터만 (베이스 모델 학습 범위)
         df_train = df[(df['year'] >= 2021) & (df['year'] <= 2023)].copy()
         
-        if len(df_train) < 52:
-            return {'status': 'error', 'reason': 'insufficient training data'}
+        if len(df_train) < 12:  # 최소 12개월 (1년)
+            return {'status': 'error', 'reason': 'insufficient training data', 
+                    'series_id': series_id}
         
         y = df_train['claim_count'].values
         
@@ -58,7 +67,7 @@ def forecast_single_series(args_tuple):
         
         model_spec = model_info.get('model_spec', {})
         order = model_spec.get('order', (1, 0, 1))
-        seasonal_order = model_spec.get('seasonal_order', (1, 0, 1, 52))
+        seasonal_order = model_spec.get('seasonal_order', (1, 0, 1, 12))  # 월별: 12
         
         model = SARIMAX(
             y,
@@ -82,30 +91,33 @@ def forecast_single_series(args_tuple):
         forecast_result = fitted_model.get_forecast(steps=horizon)
         conf_int = forecast_result.conf_int(alpha=0.05)  # 95% CI
         
-        # 주차 계산 (대상 월의 첫 주부터)
+        # 월 계산 (대상 월부터 horizon개월)
         year_int = int(year)
         month_int = int(month)
         
-        # 월의 첫 날
-        first_day = datetime(year_int, month_int, 1)
-        
-        # ISO week 계산
-        weeks = []
+        # 월 리스트 생성
+        months = []
         for i in range(horizon):
-            date = first_day + timedelta(weeks=i)
-            iso_year, iso_week, _ = date.isocalendar()
-            weeks.append({'year': iso_year, 'week': iso_week})
+            target_month = month_int + i
+            target_year = year_int
+            
+            # 월이 12를 넘으면 연도 증가
+            while target_month > 12:
+                target_month -= 12
+                target_year += 1
+            
+            months.append({'year': target_year, 'month': target_month})
         
         # 결과 DataFrame
         forecasts = []
         for i in range(horizon):
             forecasts.append({
                 'series_id': series_id,
-                'year': weeks[i]['year'],
-                'week': weeks[i]['week'],
+                'year': months[i]['year'],
+                'month': months[i]['month'],
                 'y_pred': float(forecast[i]),
-                'y_pred_lower': float(conf_int.iloc[i, 0]),
-                'y_pred_upper': float(conf_int.iloc[i, 1]),
+                'y_pred_lower': float(conf_int[i, 0]),
+                'y_pred_upper': float(conf_int[i, 1]),
                 'forecast_date': datetime.now().strftime('%Y-%m-%d')
             })
         
@@ -115,10 +127,12 @@ def forecast_single_series(args_tuple):
         }
     
     except Exception as e:
+        import traceback
         return {
             'status': 'error',
-            'series_id': series_id,
+            'series_id': model_info.get('series_id', 'unknown') if 'model_info' in locals() else 'unknown',
             'error': str(e),
+            'traceback': traceback.format_exc(),
             'forecasts': []
         }
 
@@ -128,7 +142,7 @@ def generate_monthly_forecast(
     month: int,
     models_dir: str = "artifacts/models/base_monthly",
     output_dir: str = None,
-    horizon: int = 26,  # 다음 26주 (6개월)
+    horizon: int = 6,  # 다음 6개월
     max_workers: int = 4
 ):
     """
@@ -145,14 +159,14 @@ def generate_monthly_forecast(
     output_dir : str
         출력 디렉토리 (기본: artifacts/forecasts/YYYY/)
     horizon : int
-        예측 주차 수
+        예측 월 수
     max_workers : int
         병렬 worker 수
     """
     print("=" * 80)
     print(f"월별 예측 생성: {year}년 {month}월")
     print("=" * 80)
-    print(f"Horizon: {horizon}주")
+    print(f"Horizon: {horizon}개월")
     print(f"Workers: {max_workers}")
     
     models_dir = Path(models_dir)
@@ -171,8 +185,7 @@ def generate_monthly_forecast(
     # 예측 작업 준비
     tasks = []
     for model_path in model_files:
-        series_id = model_path.stem
-        tasks.append((series_id, model_path, horizon, year, month))
+        tasks.append((model_path, horizon, year, month))
     
     print(f"\n예측 시작...")
     
@@ -209,6 +222,8 @@ def generate_monthly_forecast(
         print(f"\n❌ 실패 샘플 (처음 5개):")
         for err in errors[:5]:
             print(f"  - {err.get('series_id', 'unknown')}: {err.get('error', 'unknown error')}")
+            if 'traceback' in err and err['traceback']:
+                print(f"    Traceback: {err['traceback'][:500]}...")  # 처음 500자만
     
     if not all_forecasts:
         print("  ⚠️  예측 결과 없음")
@@ -230,7 +245,8 @@ def generate_monthly_forecast(
     # 통계
     print(f"\n예측 통계:")
     print(f"  시리즈 수: {df_forecast['series_id'].nunique():,}개")
-    print(f"  주차 범위: {df_forecast['week'].min()}-{df_forecast['week'].max()}")
+    print(f"  월 범위: {df_forecast['year'].min()}-{df_forecast['month'].min()} ~ "
+          f"{df_forecast['year'].max()}-{df_forecast['month'].max()}")
     print(f"  평균 예측값: {df_forecast['y_pred'].mean():.2f}")
     print(f"  예측값 합계: {df_forecast['y_pred'].sum():.0f}")
     
@@ -244,7 +260,7 @@ def main():
     parser.add_argument("--models-dir", type=str, default="artifacts/models/base_monthly",
                         help="모델 디렉토리")
     parser.add_argument("--output-dir", type=str, help="출력 디렉토리 (기본: artifacts/forecasts/YYYY/)")
-    parser.add_argument("--horizon", type=int, default=26, help="예측 주차 수 (기본: 26주 = 6개월)")
+    parser.add_argument("--horizon", type=int, default=6, help="예측 월 수 (기본: 6개월)")
     parser.add_argument("--max-workers", type=int, default=4, help="병렬 worker 수")
     
     args = parser.parse_args()

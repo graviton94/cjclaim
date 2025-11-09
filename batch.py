@@ -49,6 +49,7 @@ def main():
     retrain_parser = subparsers.add_parser("retrain", help="Incremental model retraining")
     retrain_parser.add_argument("--month", type=str, required=True, help="대상 월 (YYYY-MM)")
     retrain_parser.add_argument("--workers", type=int, default=4, help="병렬 처리 worker 수")
+    retrain_parser.add_argument("--series-list", type=str, help="재학습 대상 시리즈 리스트(txt)")
 
     args = parser.parse_args()
 
@@ -72,16 +73,26 @@ def main():
             print("=" * 80)
             print("월별 예측 생성")
             print("=" * 80)
-            
+
             year, month = args.month_new.split('-')
-            
+
+            # Check for cycle_features.parquet and generate if missing
+            features_parquet = Path("data/features/cycle_features.parquet")
+            if not features_parquet.exists():
+                print(f"[INFO] cycle_features.parquet not found. Generating...")
+                gen_cmd = [sys.executable, "tools/generate_cycle_features_parquet.py"]
+                gen_result = subprocess.run(gen_cmd)
+                if gen_result.returncode != 0:
+                    print("❌ Failed to generate cycle_features.parquet.")
+                    sys.exit(1)
+
             cmd = [
                 sys.executable, "generate_monthly_forecast.py",
                 "--year", year,
                 "--month", month,
                 "--max-workers", "4"
             ]
-            
+
             print(f"\n명령: {' '.join(cmd)}")
             result = subprocess.run(cmd)
             sys.exit(result.returncode)
@@ -169,21 +180,31 @@ def main():
         print("=" * 80)
         print("증분 재학습")
         print("=" * 80)
-        
+
         year, month = args.month.split('-')
         print(f"\n대상 월: {year}년 {month}월")
         print(f"Workers: {args.workers}")
-        
+
+        # Check for cycle_features.parquet and generate if missing
+        features_parquet = Path("data/features/cycle_features.parquet")
+        if not features_parquet.exists():
+            print(f"[INFO] cycle_features.parquet not found. Generating...")
+            gen_cmd = [sys.executable, "tools/generate_cycle_features_parquet.py"]
+            gen_result = subprocess.run(gen_cmd)
+            if gen_result.returncode != 0:
+                print("❌ Failed to generate cycle_features.parquet.")
+                sys.exit(1)
+
         cmd = [
             sys.executable, "train_incremental_models.py",
             "--year", year,
             "--month", month,
             "--max-workers", str(args.workers)
         ]
-        
+
         print(f"\n명령: {' '.join(cmd)}")
         result = subprocess.run(cmd)
-        
+
         sys.exit(result.returncode)
     
     else:

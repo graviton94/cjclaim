@@ -19,14 +19,16 @@ def calculate_lag_stats(df):
     Returns:
         DataFrame: product_cat2, mu, sigma, p90, p95, n, use_global
     """
-    # 접수일 - 제조일 계산 (일 단위)
+    # 접수일(발생일자) - 제조일 계산 (일 단위)
     df['lag_days'] = (pd.to_datetime(df['접수일']) - pd.to_datetime(df['제조일자'])).dt.days
     
-    # 음수 lag 제거 (데이터 오류)
+    # 음수 lag 제거 (제조일자 > 발생일자 → 잘못 접수된 케이스)
+    df_invalid_negative = df[df['lag_days'] < 0]
     df_valid = df[df['lag_days'] >= 0].copy()
     
     print(f"총 레코드: {len(df):,}건")
-    print(f"유효 레코드: {len(df_valid):,}건 (음수 lag {len(df) - len(df_valid):,}건 제외)")
+    print(f"유효 레코드: {len(df_valid):,}건")
+    print(f"⚠️  잘못 접수 제외: {len(df_invalid_negative):,}건 (제조일자 > 발생일자, 음수 lag)")
     
     # 제품범주2별 통계
     stats_list = []
@@ -87,20 +89,29 @@ def label_and_filter(df, ref_stats):
         labeled_df: lag_class 컬럼 추가된 DataFrame
         candidates_df: retrain 후보 (normal + borderline만)
     """
-    # lag 계산
+    # lag 계산 (발생일자 - 제조일자)
     df['lag_days'] = (pd.to_datetime(df['접수일']) - pd.to_datetime(df['제조일자'])).dt.days
     
-    # 음수 lag는 extreme으로 처리
+    # 초기화: 모든 레코드 extreme으로 시작
     df['lag_class'] = 'extreme'
-    df.loc[df['lag_days'] < 0, 'lag_class'] = 'extreme_negative'
+    
+    # ⚠️ 음수 lag (제조일자 > 발생일자) → 잘못 접수된 케이스로 분류
+    invalid_negative_mask = df['lag_days'] < 0
+    df.loc[invalid_negative_mask, 'lag_class'] = 'invalid_negative'
+    
+    print(f"\n⚠️  잘못 접수 케이스: {invalid_negative_mask.sum():,}건 (제조일자 > 발생일자)")
+    
+    # 유효 레코드(lag >= 0)에 대해서만 라벨링
+    valid_mask = df['lag_days'] >= 0
+    print(f"\n⚠️  잘못 접수 케이스: {invalid_negative_mask.sum():,}건 (제조일자 > 발생일자)")
+    
+    # 유효 레코드(lag >= 0)에 대해서만 라벨링
+    valid_mask = df['lag_days'] >= 0
     
     # 제품범주2별 라벨링
-    for idx, row in df.iterrows():
-        if df.loc[idx, 'lag_days'] < 0:
-            continue
-        
-        product_cat2 = row['제품범주2']
-        lag = row['lag_days']
+    for idx in df[valid_mask].index:
+        product_cat2 = df.loc[idx, '제품범주2']
+        lag = df.loc[idx, 'lag_days']
         
         # 해당 제품범주2의 통계 찾기
         stat = ref_stats[ref_stats['product_cat2'] == product_cat2]
@@ -114,7 +125,7 @@ def label_and_filter(df, ref_stats):
             mu = stat.iloc[0]['mu']
             sigma = stat.iloc[0]['sigma']
         
-        # 라벨링
+        # μ+σ 기준 라벨링
         if lag <= mu + sigma:
             df.loc[idx, 'lag_class'] = 'normal'
         elif lag <= mu + 2 * sigma:
@@ -122,14 +133,24 @@ def label_and_filter(df, ref_stats):
         else:
             df.loc[idx, 'lag_class'] = 'extreme'
     
-    # 라벨 분포
-    print("\n라벨 분포:")
-    print(df['lag_class'].value_counts())
+    # 라벨 분포 출력
+    print("\n📊 Lag 라벨 분포:")
+    label_counts = df['lag_class'].value_counts()
+    print(label_counts)
     print(f"\n비율:")
-    print(df['lag_class'].value_counts(normalize=True) * 100)
+    label_pct = df['lag_class'].value_counts(normalize=True) * 100
+    for label, pct in label_pct.items():
+        print(f"  {label:20s}: {pct:5.1f}%")
     
-    # normal + borderline만 학습 후보
+    # normal + borderline만 학습 후보 (invalid_negative와 extreme 제외)
     candidates = df[df['lag_class'].isin(['normal', 'borderline'])].copy()
+    
+    print(f"\n✅ 학습 후보: {len(candidates):,}건 / {len(df):,}건 ({len(candidates)/len(df)*100:.1f}%)")
+    print(f"   - Normal:     {(df['lag_class'] == 'normal').sum():,}건")
+    print(f"   - Borderline: {(df['lag_class'] == 'borderline').sum():,}건")
+    print(f"\n❌ 학습 제외: {len(df) - len(candidates):,}건")
+    print(f"   - Invalid (음수 lag): {(df['lag_class'] == 'invalid_negative').sum():,}건")
+    print(f"   - Extreme (μ+2σ 초과): {(df['lag_class'] == 'extreme').sum():,}건")
     
     # weight 할당
     candidates['sample_weight'] = candidates['lag_class'].map({
@@ -173,13 +194,25 @@ def main():
     
     print(f"레코드: {len(df):,}건")
     
-    # 컬럼명 고정 매핑
-    expected_cols = ['발생일자', '중분류(보정)', '플랜트', '제품범주2', '제조일자', 'count']
+    # 컬럼명 고정 매핑 (추가 컬럼 허용)
+    expected_cols = ['발생일자', '중분류', '플랜트', '제품범주2', '제조일자', 'count']
+    
+    # 컬럼 수가 정확히 일치하면 표준화
     if len(df.columns) == len(expected_cols):
         df.columns = expected_cols
         print(f"컬럼명 표준화 완료: {df.columns.tolist()}")
+    # 더 많은 컬럼이 있으면 (year, month 등 추가 컬럼 포함)
+    elif len(df.columns) > len(expected_cols):
+        # 필수 컬럼이 모두 있는지 확인
+        missing_required = [col for col in expected_cols if col not in df.columns]
+        if not missing_required:
+            print(f"✅ 필수 컬럼 확인 완료 (추가 컬럼 포함: {[c for c in df.columns if c not in expected_cols]})")
+        else:
+            # 첫 6개가 필수 컬럼 순서라고 가정
+            df.columns = expected_cols + list(df.columns[len(expected_cols):])
+            print(f"컬럼명 표준화 완료 (추가 컬럼 보존): {df.columns.tolist()}")
     else:
-        print(f"경고: 예상 컬럼 수({len(expected_cols)})와 실제 컬럼 수({len(df.columns)})가 다릅니다.")
+        print(f"경고: 예상 컬럼 수({len(expected_cols)})보다 적습니다({len(df.columns)}).")
         print(f"현재 컬럼: {df.columns.tolist()}")
     
     # 발생일자를 접수일로 사용
@@ -250,12 +283,12 @@ def main():
             print(f"✅ 학습 후보 저장: {candidates_path}")
         
         # 시리즈별 요약 (표준화된 컬럼명 사용)
-        series_summary = candidates_df.groupby(['플랜트', '제품범주2', '중분류(보정)']).agg({
+        series_summary = candidates_df.groupby(['플랜트', '제품범주2', '중분류']).agg({
             'count': 'sum',
             'sample_weight': 'mean',
             'lag_class': lambda x: (x == 'normal').sum()
         }).reset_index()
-        series_summary.columns = ['플랜트', '제품범주2', '중분류(보정)', '총클레임', '평균가중치', 'normal건수']
+        series_summary.columns = ['플랜트', '제품범주2', '중분류', '총클레임', '평균가중치', 'normal건수']
         
         print("\n시리즈별 요약 (상위 10개):")
         print(series_summary.nlargest(10, '총클레임').to_string(index=False))

@@ -148,3 +148,15 @@ def safe_forecast(y: pd.Series, horizon: int = 26, seasonal_order=(0,1,1,52), ci
         "yhat_upper": pd.Series(hi_final),
         "model": model_tag
     }
+
+def load_model(series_id, year):
+    """시리즈별 연도별 더미 모델 로드 (실제 모델 로딩 로직에 맞게 구현 필요)"""
+    class DummyModel:
+        def forecast(self, steps):
+            return np.zeros(steps)
+    return DummyModel()
+
+def seasonal_naive(y, horizon=52):
+    """공개 seasonal_naive 함수 (내부 _naive_seasonal 래핑)"""
+    seq, lo, hi = _naive_seasonal(y, horizon=horizon, season=52, ci=0.95)
+    return seq

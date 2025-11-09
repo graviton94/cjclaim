@@ -3,369 +3,9 @@
   "plant": "진천BC",
   "product_cat2": "까스류",
   "mid_category": "동물성이물",
-  "total_claims": 19.0,
-  "updated_at": "2025-11-06T17:23:03.428091",
+  "total_claims": 22.0,
+  "updated_at": "2025-11-07T17:39:25.382719",
   "data": [
-    {
-      "year": 2011,
-      "month": 1,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2011,
-      "month": 2,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2011,
-      "month": 3,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2011,
-      "month": 4,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2011,
-      "month": 5,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2011,
-      "month": 6,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2011,
-      "month": 7,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2011,
-      "month": 8,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2011,
-      "month": 9,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2011,
-      "month": 10,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2011,
-      "month": 11,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2011,
-      "month": 12,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2012,
-      "month": 1,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2012,
-      "month": 2,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2012,
-      "month": 3,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2012,
-      "month": 4,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2012,
-      "month": 5,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2012,
-      "month": 6,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2012,
-      "month": 7,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2012,
-      "month": 8,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2012,
-      "month": 9,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2012,
-      "month": 10,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2012,
-      "month": 11,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2012,
-      "month": 12,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2013,
-      "month": 1,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2013,
-      "month": 2,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2013,
-      "month": 3,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2013,
-      "month": 4,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2013,
-      "month": 5,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2013,
-      "month": 6,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2013,
-      "month": 7,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2013,
-      "month": 8,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2013,
-      "month": 9,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2013,
-      "month": 10,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2013,
-      "month": 11,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2013,
-      "month": 12,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2014,
-      "month": 1,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2014,
-      "month": 2,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2014,
-      "month": 3,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2014,
-      "month": 4,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2014,
-      "month": 5,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2014,
-      "month": 6,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2014,
-      "month": 7,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2014,
-      "month": 8,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2014,
-      "month": 9,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2014,
-      "month": 10,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2014,
-      "month": 11,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2014,
-      "month": 12,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2015,
-      "month": 1,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2015,
-      "month": 2,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2015,
-      "month": 3,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2015,
-      "month": 4,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2015,
-      "month": 5,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2015,
-      "month": 6,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2015,
-      "month": 7,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2015,
-      "month": 8,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2015,
-      "month": 9,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2015,
-      "month": 10,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2015,
-      "month": 11,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2015,
-      "month": 12,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2016,
-      "month": 1,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2016,
-      "month": 2,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2016,
-      "month": 3,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2016,
-      "month": 4,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2016,
-      "month": 5,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2016,
-      "month": 6,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2016,
-      "month": 7,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2016,
-      "month": 8,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2016,
-      "month": 9,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2016,
-      "month": 10,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2016,
-      "month": 11,
-      "claim_count": 0.0
-    },
-    {
-      "year": 2016,
-      "month": 12,
-      "claim_count": 0.0
-    },
     {
       "year": 2017,
       "month": 1,
@@ -644,12 +284,12 @@
     {
       "year": 2021,
       "month": 8,
-      "claim_count": 0.0
+      "claim_count": 1.0
     },
     {
       "year": 2021,
       "month": 9,
-      "claim_count": 0.0
+      "claim_count": 1.0
     },
     {
       "year": 2021,
@@ -704,7 +344,7 @@
     {
       "year": 2022,
       "month": 8,
-      "claim_count": 0.0
+      "claim_count": 1.0
     },
     {
       "year": 2022,
@@ -749,12 +389,12 @@
     {
       "year": 2023,
       "month": 5,
-      "claim_count": 1.0
+      "claim_count": 0.0
     },
     {
       "year": 2023,
       "month": 6,
-      "claim_count": 0.0
+      "claim_count": 1.0
     },
     {
       "year": 2023,
@@ -784,6 +424,16 @@
     {
       "year": 2023,
       "month": 12,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2024,
+      "month": 1,
+      "claim_count": 0.0
+    },
+    {
+      "year": 2024,
+      "month": 2,
       "claim_count": 0.0
     }
   ]

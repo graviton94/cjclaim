@@ -1,9 +1,9 @@
 {
-  "total_series": 337,
-  "created_files": 219,
-  "skipped_series": 118,
+  "total_series": 1173,
+  "created_files": 832,
+  "skipped_series": 341,
   "min_records_threshold": 10,
-  "has_quality_metadata": false,
+  "has_quality_metadata": true,
   "input_file": "data/curated/claims_monthly.parquet",
   "output_directory": "data\\features"
 }

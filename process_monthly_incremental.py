@@ -19,7 +19,8 @@ def append_new_month(master_df, csv_path, year, month):
     # 컬럼명 매핑 (업로드 CSV → 내부 형식)
     column_mapping = {
         '발생일자': 'occurrence_date',  # 발생일자는 사용 안 하지만 매핑
-        '중분류(보정)': 'mid_category',
+        '중분류': 'mid_category',  # 중분류
+        '중분류(보정)': 'mid_category',  # 중분류(보정) - 둘 다 지원
         '플랜트': 'plant',
         '제품범주2': 'product_cat2',
         '제조일자': 'manufacturing_date',
@@ -138,6 +139,45 @@ def main():
         Path(args.output_list).write_text('\n'.join(updated_list), encoding='utf-8')
         print(f"[INFO] List saved: {args.output_list}")
     
+    # 파이프라인 결과 저장 경로
+    incremental_dir = Path(f"artifacts/incremental/{args.year}{args.month:02d}")
+    incremental_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. 예측 결과 생성
+    forecast_path = incremental_dir / "forecast.parquet"
+    import subprocess
+    subprocess.run([
+        sys.executable, "pipeline_forecast.py",
+        "--year", str(args.year),
+        "--month", str(args.month),
+        "--output", str(forecast_path)
+    ], check=True)
+
+    # 2. 평가 결과 생성
+    evaluation_path = incremental_dir / "evaluation.json"
+    subprocess.run([
+        sys.executable, "evaluate_predictions.py",
+        "--year", str(args.year),
+        "--month", str(args.month),
+        "--output", str(evaluation_path)
+    ], check=True)
+
+    # 3. 모델 재학습 결과 생성
+    model_path = incremental_dir / "model.pkl"
+    subprocess.run([
+        sys.executable, "train_incremental_models.py",
+        "--year", str(args.year),
+        "--month", str(args.month),
+        "--output", str(model_path)
+    ], check=True)
+
+    # 4. 결과 파일 생성 여부 검증
+    required_files = [forecast_path, evaluation_path, model_path]
+    missing = [str(f) for f in required_files if not f.exists()]
+    if missing:
+        print(f"[ERROR] Missing files: {missing}")
+    else:
+        print("[SUCCESS] All result files exist.")
     return 0
 
 if __name__ == '__main__':

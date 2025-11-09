@@ -3,7 +3,8 @@ import io
 import csv
 import pandas as pd
 from typing import Dict, Union, IO
-from .constants import SCHEMA_MIN
+from src.constants import SCHEMA_MIN
+from pathlib import Path
 
 class SchemaError(Exception):
     """스키마 오류."""
@@ -87,7 +88,7 @@ def _parse_date(s: pd.Series) -> pd.Series:
 def load_min_csv(path_or_file: Union[str, IO[bytes]]) -> pd.DataFrame:
     """
     최소 스키마 CSV 로드:
-    제품범주2, 플랜트, 제조일자, 중분류(보정), count
+    제품범주2, 플랜트, 제조일자, 중분류, count
     - 인코딩 자동 판별(utf-8-sig/utf-8/cp949/euc-kr/latin1)
     - 구분자 자동 추정(, | \\t | ;)
     """
@@ -111,6 +112,19 @@ def load_min_csv(path_or_file: Union[str, IO[bytes]]) -> pd.DataFrame:
         elif typ == "str":
             df[col] = df[col].astype(str).str.strip()
 
-    # 내부 표준 컬럼명: '중분류(보정)' -> '중분류'
-    df = df.rename(columns={"중분류(보정)": "중분류"})
     return df
+
+def write_parquet(df, path):
+    """DataFrame을 지정 경로에 parquet으로 저장"""
+    import pandas as pd
+    df.to_parquet(path, index=False)
+
+def log_jsonl(obj, path="artifacts/logs/pipeline_events.jsonl"):
+    """dict 객체를 jsonl 파일에 append 저장"""
+    import json
+    import os
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+
+ART =  Path("artifacts")

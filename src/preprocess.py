@@ -17,8 +17,10 @@ def create_complete_yearmonth_grid(df: pd.DataFrame, pad_to: tuple) -> pd.DataFr
     Returns:
         year, month 컬럼을 가진 데이터프레임
     """
-    min_year = df['year'].min()
+    min_year = int(df['year'].min())
     max_year, max_month = pad_to
+    max_year = int(max_year)
+    max_month = int(max_month)
     
     # 모든 연도-월 조합 생성
     year_months = []

@@ -1,29 +1,43 @@
-Quality-cycles — 품질 클레임 주간 예측 시스템
+Quality-Cycles — 품질 클레임 월별 예측 시스템 (EWS v2)
 
 ## 🎯 주요 기능
 
 ### 1. Base Training (2021-2023)
-- 2,208개 SARIMAX 모델 학습 (84.7% 성공률)
-- Lag 기반 품질 필터링 (Normal-Lag 정책)
+- **월별 SARIMA 모델 학습** (기존 주간 → 월별 전환 완료)
+- **3-Metric KPI**: WMAPE/SMAPE/Bias 통합 평가 (기존 단일 MAPE 대체)
+- **Enhanced Sparse Filter**: avg<0.5 OR nonzero<30% 자동 제외
+- **Manifest System**: Git commit, data hash, seed 기반 재현성 보장
+- Lag 기반 품질 필터링 (Normal-Lag 정책: μ+σ 기준)
 - 시리즈별 JSON 데이터 관리
 
-### 2. 월별 증분학습 시스템
+### 2. EWS v2 - 5-Factor Early Warning System
+- **F1 Growth Ratio**: 예측평균 / 과거평균 (증가세 감지)
+- **F2 Confidence**: 예측 구간 압축률 + 실제 커버리지 (신뢰도)
+- **F3 Seasonality**: 1 - Var(resid)/Var(y) (STL 계절성 강도)
+- **F4 Amplitude**: (max-min) / mean (계절 진폭)
+- **F5 Rising-Inflection**: 가속도 + 변화점 확률 (추세 변곡)
+- **Weight Learning**: Logistic Regression + Rolling 3-Fold CV 자동 최적화
+- **Candidate Filtering**: S≥0.4, A≥0.3 자동 선정
+- **출력**: ews_scores.csv (rank, level, 5-factor 분해, rationale)
+
+### 3. 월별 증분학습 시스템
 - 발생일자 기준 1개월 데이터 처리
-- Lag 필터링 → 주간 집계 → 예측 비교 → 재학습
+- Lag 필터링 → 월별 집계 → 예측 비교 → 재학습
 - **Warm Start:** start_params로 빠른 수렴 (~75% 시간 절감)
 - **Sample Weights:** Normal=1.0, Borderline=0.5
 - Streamlit UI를 통한 손쉬운 업로드 및 모니터링
 
-### 3. Reconcile 보정 시스템 (3단계)
-- **Stage 1: Bias Map** - 주간 평균 오차 보정 (초 단위)
+### 4. Reconcile 보정 시스템 (3단계)
+- **Stage 1: Bias Map** - 월별 평균 오차 보정 (초 단위)
 - **Stage 2: Seasonal Recalibration** - STL 계절성 재추정 (분 단위)
 - **Stage 3: Optuna Tuning** - 하이퍼파라미터 최적화 (시간 단위)
-- KPI 게이트 자동 체크 (MAPE<20%, |Bias|<0.05)
+- KPI 게이트 자동 체크 (WMAPE<20%, |Bias|<0.05)
 
-### 4. 예측 생성 파이프라인
-- 다음 8주 예측 (horizon 조정 가능)
+### 5. 예측 생성 파이프라인
+- 다음 6개월 예측 (horizon 조정 가능)
 - 95% 신뢰구간 계산
 - 병렬 처리로 빠른 예측 생성
+- EWS 점수 자동 계산 및 랭킹
 
 ---
 
@@ -55,11 +69,63 @@ python -m streamlit run app.py
 
 ## 📋 Pipeline Commands
 
-### Base Training
+### 데이터 준비 (Fresh Start)
 
 ```powershell
-# 2021-2023 Base 학습
-python batch.py train --mode base --workers 4
+# 1단계: 연도별 CSV 병합 (2021_raw.csv + 2022_raw.csv + 2023_raw.csv)
+python merge_yearly_data.py `
+  --input-dir C:\cjclaim\data `
+  --output data/raw/claims_merged.csv
+
+# 2단계: Lag 필터링 (Normal/Borderline/Extreme 분류)
+python tools/lag_analyzer.py `
+  --input data/raw/claims_merged.csv `
+  --output data/curated/claims_filtered.csv
+
+# 3단계: 월별 전처리 및 JSON 생성
+python preprocess_to_curated.py --input data/curated/claims_filtered.csv
+python generate_series_json.py
+```
+
+### Base Training (2021-2023)
+
+```powershell
+# 3-Metric KPI + Manifest 생성 (권장: auto-optimize + seed 고정)
+python train_base_models.py `
+  --auto-optimize `
+  --max-workers 4 `
+  --seed 42
+
+# 출력 확인:
+# - artifacts/models/base_2021_2023/*.pkl (모델 파일)
+# - artifacts/models/base_2021_2023/training_results.csv (WMAPE/SMAPE/Bias)
+# - artifacts/models/base_2021_2023/kpi_summary.json (성능 분포)
+# - artifacts/models/base_2021_2023/manifest.json (재현성 정보)
+```
+
+### EWS v2 - Weight Learning & Scoring
+
+```powershell
+# 1단계: 6개월 예측 생성
+python generate_forecast_monthly.py `
+  --year 2024 `
+  --month 1 `
+  --horizon 6
+
+# 2단계: Weight Learning (Rolling 3-Fold CV)
+python backtest_ews_weights.py `
+  --delta 0.3 `
+  --horizon 6 `
+  --output artifacts/metadata/threshold.json
+
+# 3단계: EWS 5-Factor Scoring
+python -m src.ews_scoring_v2 `
+  --forecast artifacts/forecasts/forecast_2024_01.csv `
+  --threshold artifacts/metadata/threshold.json `
+  --output artifacts/forecasts/ews_scores_2024_01.csv
+
+# 출력 확인:
+# - ews_scores.csv: rank, level, f1_ratio, f2_conf, f3_season, f4_ampl, f5_inflect, rationale
 ```
 
 ### 월별 증분학습 (완전 자동화)
@@ -144,13 +210,77 @@ quality-cycles/
 │
 ├── pipeline_train.py               # Base 학습 파이프라인
 ├── pipeline_forecast.py            # 예측 파이프라인
-├── pipeline_reconcile.py           # 보정 파이프라인
+├── reconcile_pipeline.py           # 보정 파이프라인
 ├── roll_pipeline.py                # 롤링 백테스트
 │
-├── train_base_models.py            # Base 학습 로직
-├── train_incremental_models.py     # 증분 재학습 (Warm Start)
-├── generate_monthly_forecast.py    # 월별 예측 생성
+├── train_base_models.py            # Base 학습 로직 (3-Metric + Manifest)
+├── train_incremental_models.py     # 증분 재학습 (Warm Start) [TODO: 3-Metric 적용]
+├── generate_forecast_monthly.py    # 월별 예측 생성
 ├── reconcile_pipeline.py           # 3단계 Reconcile (Bias/Seasonal/Optuna)
+│
+├── merge_yearly_data.py            # 연도별 CSV 병합 (2021+2022+2023)
+├── preprocess_to_curated.py        # 전처리 (lag filter → monthly aggregate)
+├── generate_series_json.py         # 시리즈별 JSON 생성
+│
+├── backtest_ews_weights.py         # EWS Weight Learning (Logistic + Rolling CV)
+│
+├── src/
+│   ├── ews_scoring_v2.py          # ⭐ EWS 5-Factor Scoring Engine
+│   ├── metrics_v2.py              # ⭐ 3-Metric KPI (WMAPE/SMAPE/Bias)
+│   ├── manifest.py                # ⭐ Reproducibility Tracking
+│   │
+│   ├── ews_scoring.py             # [OLD] 단일 점수 방식 (v1)
+│   ├── metrics.py                 # [OLD] MAPE 단일 지표
+│   │
+│   ├── forecasting.py             # SARIMA 학습/예측 핵심 로직
+│   ├── reconcile.py               # Bias/Seasonal 보정
+│   ├── preprocess.py              # Lag 필터링 유틸리티
+│   ├── scoring.py                 # 성능 점수 계산
+│   ├── io_utils.py                # 파일 I/O 헬퍼
+│   ├── guards.py                  # 입력 검증 로직
+│   ├── constants.py               # 공통 상수 정의
+│   ├── cycle_features.py          # 주기성 특징 추출
+│   ├── changepoint.py             # 변화점 탐지 (ruptures)
+│
+├── tools/
+│   ├── lag_analyzer.py            # ⭐ Lag 필터링 (Normal/Borderline/Extreme, μ+σ 방식)
+│   ├── filter_monthly_data.py     # 월별 데이터 필터링
+│   ├── compare_forecast_actual.py # 예측-실측 비교 분석
+│   ├── run_optuna.py              # Hyperparameter Tuning
+│   ├── validate_baseline.py       # Baseline 성능 검증
+│   ├── analyze_predictability.py  # 예측 가능성 분석
+│
+├── scripts/
+│   ├── build_dataset.py           # 데이터셋 구축 스크립트
+│   ├── build_weekly_timeseries.py # 주간 시계열 생성 [구버전]
+│
+├── data/
+│   ├── raw/                       # 원본 데이터 (claims_merged.csv)
+│   ├── curated/                   # 전처리 완료 (lag filtered, monthly)
+│   └── features/                  # JSON 시계열 데이터 (제품범주2/공장/세부내용별)
+│
+├── artifacts/
+│   ├── models/                    # PKL 모델 파일 (base_2021_2023/)
+│   ├── forecasts/                 # 예측 결과 (forecast_YYYY_MM.csv, ews_scores.csv)
+│   ├── metrics/                   # 성능 지표 (training_results.csv, kpi_summary.json)
+│   ├── metadata/                  # Manifest, threshold.json (EWS weights)
+│   ├── adjustments/               # Reconcile 보정 파일
+│   └── mlruns/                    # MLflow 실험 추적 (선택)
+│
+├── docs/
+│   ├── EWS_V2_UPGRADE.md          # ⭐ EWS v2 업그레이드 가이드
+│   ├── INCREMENTAL_LEARNING.md    # 증분학습 설명서
+│   └── RECONCILE.md               # Reconcile 3단계 상세
+│
+├── configs/
+│   └── config.yaml                # 전역 설정 (경로, 파라미터)
+│
+├── README.md                       # 프로젝트 개요 및 사용법
+├── SYSTEM_SUMMARY.md              # 시스템 아키텍처 요약
+├── NEXT_STEPS_COMPLETED.md        # 완료된 구현 사항
+├── CLEANUP_DONE.md                # 정리 완료 내역
+└── requirements.txt               # Python 패키지 목록
+```
 │
 ├── preprocess_to_curated.py        # 전처리 (raw → curated)
 ├── process_monthly_data.py         # 월별 데이터 처리 (증분학습용)

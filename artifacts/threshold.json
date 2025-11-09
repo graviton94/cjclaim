@@ -1,0 +1,16 @@
+{
+  "version": "2.0",
+  "delta": 0.3,
+  "horizon": 6,
+  "weights": {
+    "ratio": 0.20,
+    "conf": 0.15,
+    "season": 0.30,
+    "ampl": 0.15,
+    "inflect": 0.20
+  },
+  "score_threshold": 0.5,
+  "method": "domain_prior",
+  "created_at": "2025-01-07T00:00:00Z",
+  "notes": "Default domain prior weights - learning skipped due to insufficient monthly samples"
+}

@@ -1,0 +1,21 @@
+{
+  "total_series": 832,
+  "successful": 588,
+  "skipped": 244,
+  "errors": 0,
+  "metrics": {
+    "wmape_mean": 186.5881358637203,
+    "wmape_median": 83.36982134676198,
+    "smape_mean": 156.29620687136944,
+    "smape_median": 159.99973928416725,
+    "bias_mean": 89.29579181618622,
+    "bias_median": -30.95995771457542,
+    "mae_mean": 9.066974992908046
+  },
+  "performance_distribution": {
+    "wmape_excellent": 23,
+    "wmape_good": 60,
+    "wmape_fair": 264,
+    "wmape_poor": 164
+  }
+}

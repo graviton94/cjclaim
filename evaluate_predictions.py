@@ -44,7 +44,7 @@ def calculate_metrics(actual, predicted):
     }
 
 
-def evaluate_predictions():
+def evaluate_predictions(year, output_path=None):
     """
     기존 예측값과 새로 추가된 실제값을 비교하여 성능 평가
     """
@@ -69,22 +69,22 @@ def evaluate_predictions():
     # Curated 데이터 로드
     df = pd.read_parquet(curated_path)
     
-    # 2025년 데이터만 추출 (평가 대상)
-    df_2025 = df[df['year'] == 2025].copy()
+    # 해당 연도 데이터만 추출 (평가 대상)
+    df_year = df[df['year'] == year].copy()
     
-    if len(df_2025) == 0:
-        print("ℹ️ 2025년 데이터가 없습니다. 평가를 건너뜁니다.")
+    if len(df_year) == 0:
+        print(f"ℹ️ {year}년 데이터가 없습니다. 평가를 건너뜁니다.")
         return
     
-    print(f"📊 2025년 데이터: {len(df_2025):,}행")
+    print(f"📊 {year}년 데이터: {len(df_year):,}행")
     
     # 주차 범위 확인
-    weeks_2025 = sorted(df_2025['week'].unique())
-    print(f"📅 2025년 주차 범위: W{min(weeks_2025):02d} ~ W{max(weeks_2025):02d} ({len(weeks_2025)}주)")
+    weeks_year = sorted(df_year['week'].unique())
+    print(f"📅 {year}년 주차 범위: W{min(weeks_year):02d} ~ W{max(weeks_year):02d} ({len(weeks_year)}주)")
     
     # 각 시리즈별 평가
     evaluations = []
-    series_list = df_2025['series_id'].unique()
+    series_list = df_year['series_id'].unique()
     
     print(f"\n🔍 {len(series_list)}개 시리즈 평가 중...")
     
@@ -113,8 +113,8 @@ def evaluate_predictions():
         forecast = model_data['forecast']
         predicted_values = forecast['yhat']  # 26주 예측값
         
-        # 실제값 추출 (2025년 해당 시리즈)
-        df_series = df_2025[df_2025['series_id'] == series_id].copy()
+        # 실제값 추출 (해당 연도 해당 시리즈)
+        df_series = df_year[df_year['series_id'] == series_id].copy()
         df_series = df_series.sort_values('week')
         
         actual_weeks = df_series['week'].tolist()
@@ -158,16 +158,22 @@ def evaluate_predictions():
         return
     
     # 결과 저장
-    eval_path = eval_dir / 'prediction_evaluation.json'
-    with open(eval_path, 'w', encoding='utf-8') as f:
-        json.dump({
-            'evaluation_date': datetime.now().isoformat(),
-            'weeks_range': {'min': int(min(weeks_2025)), 'max': int(max(weeks_2025))},
-            'n_series': len(evaluations),
-            'evaluations': evaluations
-        }, f, indent=2, ensure_ascii=False)
+    result = {
+        'evaluation_date': datetime.now().isoformat(),
+        'weeks_range': {'min': int(min(weeks_year)), 'max': int(max(weeks_year))},
+        'n_series': len(evaluations),
+        'evaluations': evaluations
+    }
     
-    print(f"💾 평가 결과 저장: {eval_path}")
+    if output_path:
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+    else:
+        eval_path = eval_dir / f"evaluation_{year}.json"
+        with open(eval_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        
+        print(f"💾 평가 결과 저장: {eval_path}")
     
     # 요약 통계
     all_mapes = [e['metrics']['mape'] for e in evaluations if e['metrics']['mape'] is not None]
@@ -178,7 +184,7 @@ def evaluate_predictions():
     print("📈 평가 요약")
     print("=" * 80)
     print(f"평가 시리즈: {len(evaluations)}개")
-    print(f"평가 주차: W{min(weeks_2025):02d} ~ W{max(weeks_2025):02d}")
+    print(f"평가 주차: W{min(weeks_year):02d} ~ W{max(weeks_year):02d}")
     
     if all_mapes:
         print(f"\nMAPE 평균: {np.mean(all_mapes):.2f}%")
@@ -207,4 +213,10 @@ def evaluate_predictions():
 
 
 if __name__ == '__main__':
-    evaluate_predictions()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--year", type=int, required=True)
+    parser.add_argument("--month", type=int, required=False)
+    parser.add_argument("--output", type=str, required=True)
+    args = parser.parse_args()
+    evaluate_predictions(args.year, args.output)

@@ -1,0 +1,35 @@
+{
+  "run_id": "2025-11-07T00-59Z_P6980",
+  "created_at": "2025-11-07T09:59:24.931322",
+  "args": "--auto-optimize --max-workers 4 --seed 42",
+  "args_dict": {
+    "json_dir": "data/features",
+    "output_dir": "artifacts/models/base_monthly",
+    "train_until": 2023,
+    "max_workers": 4,
+    "auto_optimize": true,
+    "limit": null,
+    "seed": 42
+  },
+  "git_commit": "10a16d3",
+  "cv_scheme": "holdout_6m",
+  "val_window": 6,
+  "seed": 42,
+  "optuna": {
+    "n_trials": 50,
+    "timeout_min": null
+  },
+  "sparse_filter": {
+    "avg_threshold": 0.5,
+    "nonzero_ratio_min": 0.3
+  },
+  "start": "2025-11-07T09:59:25.251281",
+  "total_series": 832,
+  "successful_series": 588,
+  "skipped_series": 244,
+  "error_series": 0,
+  "end": "2025-11-07T10:16:37.304497",
+  "exit_code": 0,
+  "duration_sec": 1032.1,
+  "duration_human": "17.2min"
+}

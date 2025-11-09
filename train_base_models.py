@@ -1,10 +1,12 @@
 """
-Base Training: 2021-2023 월별 데이터로 전체 시리즈 SARIMAX 모델 학습
+Base Training v2: 2021-2023 월별 데이터로 전체 시리즈 SARIMAX 모델 학습
 - 자동 파라미터 최적화: 시리즈별 최적 ARIMA order 탐색
 - 계절성 SARIMAX: (p,d,q)(P,D,Q,12) - 12개월 계절성
 - AIC 기반 모델 선택
 - 변곡점 감지 및 트렌드 분석
-- 교차검증으로 예측 성능 검증
+- 3-Metric KPI: WMAPE, SMAPE, Bias
+- Reproducibility Manifest: run_id, git_commit, data_hash
+- 희소 시리즈 필터링 (avg<0.5 or nonzero<30%)
 - 병렬 처리로 속도 최적화
 - artifacts/models/base_monthly/ 저장
 """
@@ -19,6 +21,12 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import argparse
 from datetime import datetime
 import warnings
+import sys
+
+# Import new modules
+from src.metrics_v2 import calculate_all_metrics, get_performance_level
+from src.manifest import ManifestBuilder, generate_run_id
+
 warnings.filterwarnings('ignore')
 
 try:
@@ -198,11 +206,11 @@ def auto_arima_selection_optuna(y, seasonal=True, n_trials=50, max_p=3, max_q=3,
 
 def cross_validate_forecast(y, order, seasonal_order, horizon=6):
     """
-    교차 검증으로 예측 성능 평가
+    교차 검증으로 예측 성능 평가 - 3-Metric KPI 계산
     - 마지막 horizon 개월을 테스트 셋으로 사용
-    - MAPE, MAE 계산
+    - WMAPE, SMAPE, Bias, MAE 계산
     
-    Returns: {'mape': float, 'mae': float, 'predictions': array}
+    Returns: {'wmape': float, 'smape': float, 'bias': float, 'mae': float, 'predictions': array}
     """
     if len(y) < horizon + 12:
         return None
@@ -223,23 +231,11 @@ def cross_validate_forecast(y, order, seasonal_order, horizon=6):
         forecast = result.forecast(steps=horizon)
         forecast = np.maximum(forecast, 0)
         
-        # MAE (Mean Absolute Error) - 먼저 계산
-        mae = np.mean(np.abs(y_test - forecast))
+        # 3-Metric KPI 계산
+        metrics = calculate_all_metrics(y_test, forecast)
+        metrics['predictions'] = forecast.tolist()
         
-        # MAPE (Mean Absolute Percentage Error)
-        # 실제값이 0인 경우 제외하고 계산
-        non_zero_mask = y_test > 0.1  # 0.1 이상인 경우만 포함
-        if non_zero_mask.sum() > 0:
-            mape = np.mean(np.abs((y_test[non_zero_mask] - forecast[non_zero_mask]) / y_test[non_zero_mask])) * 100
-        else:
-            # 모든 실제값이 0에 가까우면 MAE 기반으로 계산
-            mape = mae if mae < 1.0 else 100.0
-        
-        return {
-            'mape': float(mape),
-            'mae': float(mae),
-            'predictions': forecast.tolist()
-        }
+        return metrics
     except:
         return None
 
@@ -270,13 +266,26 @@ def train_single_series(json_path, train_until_year=2023, output_dir=None, auto_
         # 시계열 데이터 준비
         y = df_train['claim_count'].values
         
-        # 희소 시리즈 필터링: 월 평균 0.5건 이하는 스킵
+        # 희소 시리즈 필터링: 월 평균 0.5건 이하 또는 비제로 비율 30% 미만
         avg_claims_per_month = y.mean()
-        if avg_claims_per_month < 0.5:
+        nonzero_ratio = np.count_nonzero(y) / len(y)
+        
+        sparse_flag = (avg_claims_per_month < 0.5) or (nonzero_ratio < 0.3)
+        
+        if sparse_flag:
+            reason_parts = []
+            if avg_claims_per_month < 0.5:
+                reason_parts.append(f'avg={avg_claims_per_month:.2f}<0.5')
+            if nonzero_ratio < 0.3:
+                reason_parts.append(f'nonzero={nonzero_ratio:.1%}<30%')
+            sparse_reason = '; '.join(reason_parts)
+            
             return {
                 'series_id': series_id,
                 'status': 'skipped',
-                'reason': f'sparse_series (avg={avg_claims_per_month:.2f}/month)',
+                'reason': f'sparse_series ({sparse_reason})',
+                'sparse_flag': True,
+                'sparse_reason': sparse_reason,
                 'path': None
             }
         
@@ -345,14 +354,20 @@ def train_single_series(json_path, train_until_year=2023, output_dir=None, auto_
                     'n_obs': len(y),
                     'mean_claims': float(y.mean()),
                     'std_claims': float(y.std()),
+                    'nonzero_ratio': float(nonzero_ratio),
                     'changepoints': changepoints,
                     'auto_optimized': auto_optimize
                 },
                 'performance': {
                     'aic': float(result.aic),
                     'bic': float(result.bic),
-                    'cv_mape': cv_results['mape'] if cv_results else None,
-                    'cv_mae': cv_results['mae'] if cv_results else None
+                    'cv_wmape': cv_results['wmape'] if cv_results else None,
+                    'cv_smape': cv_results['smape'] if cv_results else None,
+                    'cv_bias': cv_results['bias'] if cv_results else None,
+                    'cv_mae': cv_results['mae'] if cv_results else None,
+                    'wmape_level': get_performance_level('wmape', cv_results['wmape']) if cv_results else None,
+                    'smape_level': get_performance_level('smape', cv_results['smape']) if cv_results else None,
+                    'bias_level': get_performance_level('bias', cv_results['bias']) if cv_results else None
                 },
                 'trained_at': datetime.now().isoformat(),
                 'aic': result.aic,
@@ -370,8 +385,15 @@ def train_single_series(json_path, train_until_year=2023, output_dir=None, auto_
                 'order': best_order,
                 'seasonal_order': best_seasonal,
                 'aic': float(result.aic),
-                'mape': cv_results['mape'] if cv_results else None,
-                'n_obs': len(y)
+                'wmape': cv_results['wmape'] if cv_results else None,
+                'smape': cv_results['smape'] if cv_results else None,
+                'bias': cv_results['bias'] if cv_results else None,
+                'mae': cv_results['mae'] if cv_results else None,
+                'wmape_level': get_performance_level('wmape', cv_results['wmape']) if cv_results else None,
+                'sparse_flag': False,
+                'sparse_reason': '',
+                'n_obs': len(y),
+                'nonzero_ratio': float(nonzero_ratio)
             }
         
         return {'series_id': series_id, 'status': 'error', 'reason': 'no_output_dir', 'path': None}
@@ -379,7 +401,7 @@ def train_single_series(json_path, train_until_year=2023, output_dir=None, auto_
     except Exception as e:
         return {'series_id': json_path.stem, 'status': 'error', 'reason': str(e), 'path': None}
 def main():
-    parser = argparse.ArgumentParser(description="Train base SARIMAX models with auto-optimization")
+    parser = argparse.ArgumentParser(description="Train base SARIMAX models with auto-optimization v2")
     parser.add_argument("--json-dir", type=str, default="data/features",
                         help="Directory containing series JSON files")
     parser.add_argument("--output-dir", type=str, default="artifacts/models/base_monthly",
@@ -394,10 +416,24 @@ def main():
                         help="Disable auto optimization, use fixed params (1,0,1)(1,0,1,12)")
     parser.add_argument("--limit", type=int, default=None,
                         help="Limit number of series to train (for testing)")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Random seed for reproducibility")
     args = parser.parse_args()
     
+    # Initialize reproducibility manifest
+    manifest = ManifestBuilder(run_id=generate_run_id('P'))
+    manifest.set_args(args) \
+            .set_git_info() \
+            .set_cv_scheme('holdout_6m', val_window=6) \
+            .set_seed(args.seed) \
+            .set_optuna_config(n_trials=50, timeout=None) \
+            .set_sparse_config(threshold=0.5, nonzero_min=0.3) \
+            .start()
+    
     print("=" * 80)
-    print(f"Base Training: SARIMAX Models (2021-{args.train_until})")
+    print(f"Base Training v2: SARIMAX Models (2021-{args.train_until})")
+    print(f"Run ID: {manifest.manifest['run_id']}")
+    print(f"Git Commit: {manifest.manifest['git_commit']}")
     print(f"Auto-Optimization: {'ENABLED' if args.auto_optimize else 'DISABLED (fixed params)'}")
     if args.auto_optimize and OPTUNA_AVAILABLE:
         print(f"Optimization Method: Optuna (Bayesian, 50 trials per series)")
@@ -467,14 +503,56 @@ def main():
     results_df.to_csv(results_path, index=False, encoding='utf-8-sig')
     print(f"\n[INFO] Results saved to: {results_path}")
     
-    # 상위 모델 표시
+    # KPI Summary 생성
     if success_count > 0:
         success_results = results_df[results_df['status'] == 'success'].copy()
-        success_results = success_results.sort_values('aic')
         
-        print(f"\n[INFO] Top 10 models (by AIC):")
+        kpi_summary = {
+            'total_series': len(json_files),
+            'successful': success_count,
+            'skipped': skipped_count,
+            'errors': error_count,
+            'metrics': {
+                'wmape_mean': float(success_results['wmape'].mean()),
+                'wmape_median': float(success_results['wmape'].median()),
+                'smape_mean': float(success_results['smape'].mean()),
+                'smape_median': float(success_results['smape'].median()),
+                'bias_mean': float(success_results['bias'].mean()),
+                'bias_median': float(success_results['bias'].median()),
+                'mae_mean': float(success_results['mae'].mean())
+            },
+            'performance_distribution': {
+                'wmape_excellent': int((success_results['wmape'] < 20).sum()),
+                'wmape_good': int(((success_results['wmape'] >= 20) & (success_results['wmape'] < 50)).sum()),
+                'wmape_fair': int(((success_results['wmape'] >= 50) & (success_results['wmape'] < 100)).sum()),
+                'wmape_poor': int((success_results['wmape'] >= 100).sum())
+            }
+        }
+        
+        kpi_path = Path(args.output_dir) / "kpi_summary.json"
+        with open(kpi_path, 'w') as f:
+            json.dump(kpi_summary, f, indent=2)
+        print(f"[INFO] KPI summary saved to: {kpi_path}")
+        
+        print(f"\n{'='*80}")
+        print("3-Metric KPI Performance")
+        print(f"{'='*80}")
+        print(f"WMAPE: {kpi_summary['metrics']['wmape_mean']:.2f}% (median: {kpi_summary['metrics']['wmape_median']:.2f}%)")
+        print(f"SMAPE: {kpi_summary['metrics']['smape_mean']:.2f}% (median: {kpi_summary['metrics']['smape_median']:.2f}%)")
+        print(f"Bias:  {kpi_summary['metrics']['bias_mean']:+.2f}% (median: {kpi_summary['metrics']['bias_median']:+.2f}%)")
+        print(f"\nWMAPE Distribution:")
+        print(f"  Excellent (<20%):  {kpi_summary['performance_distribution']['wmape_excellent']}")
+        print(f"  Good (20-50%):     {kpi_summary['performance_distribution']['wmape_good']}")
+        print(f"  Fair (50-100%):    {kpi_summary['performance_distribution']['wmape_fair']}")
+        print(f"  Poor (>100%):      {kpi_summary['performance_distribution']['wmape_poor']}")
+    
+    # 상위 모델 표시
+    if success_count > 0:
+        success_results = success_results.sort_values('wmape')
+        
+        print(f"\n[INFO] Top 10 models (by WMAPE):")
         for idx, row in success_results.head(10).iterrows():
-            print(f"  {row['series_id'][:50]:50s} | {row['order']} {row['seasonal_order']} | AIC: {row['aic']:,.1f} | MAPE: {row['mape']:.1f}%")
+            print(f"  {row['series_id'][:50]:50s} | WMAPE: {row['wmape']:5.1f}% | SMAPE: {row['smape']:5.1f}% | Bias: {row['bias']:+5.1f}%")
     
     # 오류 상세
     if error_count > 0:
@@ -483,7 +561,17 @@ def main():
         for idx, row in error_results.head(5).iterrows():
             print(f"  {row['series_id']}: {row['reason']}")
     
-    print("\n[SUCCESS] Base training completed!")
+    # Complete manifest
+    manifest.add_metadata('total_series', len(json_files)) \
+            .add_metadata('successful_series', success_count) \
+            .add_metadata('skipped_series', skipped_count) \
+            .add_metadata('error_series', error_count)
+    
+    exit_code = 0 if error_count == 0 else 1
+    manifest.finish(exit_code) \
+            .save(Path(args.output_dir) / 'manifest.json')
+    
+    print(f"\n[SUCCESS] Base training v2 completed! (Duration: {manifest.manifest.get('duration_human', 'N/A')})")
 
 
 if __name__ == '__main__':
