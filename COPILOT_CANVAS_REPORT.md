@@ -18,6 +18,26 @@ Quick implications and next suggested actions (so next chat can continue immedia
 - Decide whether to permanently adopt the AR-root gate in the main training flow (recommended) or apply it selectively.
 - Persist zeros in canonical feature generation (`data/features/*.json`) so downstream tools and Streamlit always see the same monthly inputs used for training.
 
+## Quick smoke-test (PowerShell)
+
+Run a short smoke test on a small sample to verify the pipeline tools and checks are wired correctly. Two safe options:
+
+- Full rerun sample (will attempt retrain/re-evaluate a small set):
+
+```powershell
+python .\tools\rerun_small_batch.py --input artifacts/retry_list_sample10.json --prefer-seasonal --delta-aic 2 --maxiter 200
+```
+
+- Read-only check (fast):
+
+```powershell
+python .\tools\check_arroot_stability.py --top 20
+```
+
+Outputs:
+- `artifacts/top20_arroot_summary.csv` and `artifacts/top20_arroot_summary.md` (this session creates a quick top-20 summary if `artifacts/arroot_filter_summary.csv` exists).
+
+
 ---
 
 ## 📂 프로젝트 구조 및 기능 요약
