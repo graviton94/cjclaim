@@ -28,6 +28,12 @@
 - 컴파일/문법 점검
   - `python -m py_compile pipeline_train.py` 결과: COMPILE_RESULT: True (문법적 오류 없음).
 
+- 커밋 및 GitHub 푸시
+  - 변경사항을 브랜치 `fix/pipeline-index-arroots-20251112`에 커밋하고 origin으로 푸시했습니다.
+  - 생성된 브랜치와 PR 링크(자동 제안):
+    - Branch: `fix/pipeline-index-arroots-20251112`
+    - PR URL: https://github.com/graviton94/cjclaim/pull/new/fix/pipeline-index-arroots-20251112
+
 ---
 
 ## 현재 상태 (요약)
@@ -44,6 +50,8 @@
 
 - pipeline_train.py
   - 정책 통일(시리즈별 재색인, 학습 컷오프 고정), baseline 조건 개선, AR-root/params 안전 저장, atomic save 및 덮어쓰기 방지.
+
+Note: `pipeline_train.py` was modified as part of the recent patchset and is included in the pushed branch `fix/pipeline-index-arroots-20251112` (committed and pushed to origin).
 
 - src/model_monthly.py
   - seasonal candidate 입력 처리 버그 수정
@@ -109,6 +117,8 @@ git commit -m "train: unify per-series indexing, robust arroots/params handling;
 ```powershell
 git push origin HEAD
 # 그런 다음 GitHub에서 PR 생성(타겟 브랜치: main 또는 team-branch)
+
+-- 현재 적용 상태: 제가 이미 `fix/pipeline-index-arroots-20251112` 브랜치를 생성해 변경을 커밋하고 origin으로 푸시했습니다. PR 생성 페이지(URL)는 위에 기재되어 있습니다. 이후 샘플 실행 또는 전체 재학습을 진행하시면 됩니다.
 ```
 
 3. PR 템플릿에 포함할 내용
