@@ -30,6 +30,118 @@ warnings.filterwarnings('ignore')
 
 
 class EWSScorer:
+    def compute_amplitude(self, historical_data: np.ndarray, period: int = 12) -> float:
+        """
+        진폭(f4_ampl) 계산: 분산 가드, 표준화, 클램프 적용
+        - 단일값/저분산 시 0.0, 정상 시 0~1 사이로 안정화
+        """
+        # Be more permissive: allow amplitude estimation with at least one seasonal cycle
+        hist = np.asarray(historical_data, dtype=float)
+        if hist.size < period:
+            return 0.0
+
+        std = float(np.std(hist))
+        if std < 1e-8:
+            return 0.0
+
+        mean_y = float(np.mean(hist))
+        if mean_y < 1e-6:
+            return 0.0
+
+        # Try STL first with seasonal=period (more standard) and robust fitting
+        try:
+            stl = STL(hist, period=period, robust=True)
+            result = stl.fit()
+            seasonal = np.asarray(result.seasonal)
+
+            # Build seasonal pattern by averaging same-month positions across cycles
+            n_cycles = max(1, len(seasonal) // period)
+            seasonal_pattern = np.zeros(period)
+            counts = np.zeros(period)
+            for idx, val in enumerate(seasonal):
+                seasonal_pattern[idx % period] += val
+                counts[idx % period] += 1
+            # avoid division by zero
+            seasonal_pattern = seasonal_pattern / np.maximum(counts, 1)
+
+            amp_raw = (seasonal_pattern.max() - seasonal_pattern.min())
+            amplitude = float(np.clip(amp_raw / max(mean_y, 1e-9), 0.0, 1.0))
+
+            # If STL returned a flat seasonal (no variation), fall back to simple monthly averages
+            if np.isclose(amp_raw, 0.0):
+                raise ValueError('flat_seasonal_from_stl')
+
+            return amplitude
+
+        except Exception:
+            # Fallback: compute monthly (periodic) averages directly from raw history
+            try:
+                seasonal_pattern = np.zeros(period)
+                counts = np.zeros(period)
+                for idx, val in enumerate(hist):
+                    seasonal_pattern[idx % period] += val
+                    counts[idx % period] += 1
+                seasonal_pattern = seasonal_pattern / np.maximum(counts, 1)
+                amp_raw = seasonal_pattern.max() - seasonal_pattern.min()
+                amplitude = float(np.clip(amp_raw / max(mean_y, 1e-9), 0.0, 1.0))
+                return amplitude
+            except Exception:
+                return 0.0
+
+    @staticmethod
+    def to_yyyymm(year: int, month: int) -> str:
+        """yyyymm 문자열 생성"""
+        return f"{year:04d}{month:02d}"
+
+    @staticmethod
+    def month_seq(start_year: int, start_month: int, n: int = 6) -> list:
+        """start_year, start_month부터 n개월 시퀀스 반환"""
+        seq = []
+        y, m = start_year, start_month
+        for _ in range(n):
+            seq.append(EWSScorer.to_yyyymm(y, m))
+            m += 1
+            if m > 12:
+                m = 1
+                y += 1
+        return seq
+
+    @staticmethod
+    def pick_pred_col(df: pd.DataFrame) -> str:
+        """예측값 컬럼 자동 선택"""
+        for c in ["yhat", "predicted_value", "forecast", "y_pred"]:
+            if c in df.columns:
+                return c
+        raise Exception("No prediction column found")
+
+    def extract_forecast_window(self, df: pd.DataFrame, year: int, month: int, window: int = 6) -> Tuple[list, list]:
+        """
+        예측 윈도우 추출: yyyymm 생성, 오름차순 정렬, 중복 제거, 결측값 삭제, 부족하면 빈 리스트 처리
+        """
+        pred_col = self.pick_pred_col(df)
+        months = []
+        values = []
+        # yyyymm 생성
+        if "year" in df.columns and "month" in df.columns:
+            df["yyyymm"] = [self.to_yyyymm(y, m) for y, m in zip(df["year"], df["month"])]
+        elif "yyyymm" not in df.columns:
+            raise Exception("No year/month/yyyymm column")
+        # 윈도우 시퀀스
+        seq = self.month_seq(year, month, window)
+        # 추출 및 정제
+        for ym in seq:
+            rows = df[df["yyyymm"] == ym]
+            if not rows.empty:
+                v = rows[pred_col].dropna().unique()
+                if len(v) > 0:
+                    months.append(ym)
+                    values.append(float(v[0]))
+        # 오름차순, 중복 제거
+        months, values = zip(*sorted(set(zip(months, values)))) if months else ([],[])
+        # 부족하면 빈 리스트 처리
+        if len(months) < window:
+            return [], []
+        return list(months), list(values)
     """5-Factor EWS Scoring Engine with Weight Learning"""
     
     def __init__(self, 
@@ -42,6 +154,7 @@ class EWSScorer:
             sparse_threshold: Avg claims/month threshold for filtering
             nonzero_ratio_min: Minimum ratio of non-zero values
         """
+        # 컬럼명 표준화는 실제 데이터 처리 함수에서 적용
         # Default domain prior weights
         self.default_weights = {
             'ratio': 0.20,
@@ -214,69 +327,7 @@ class EWSScorer:
             except:
                 return 0.0
     
-    def calculate_f4_amplitude(self,
-                                historical_data: np.ndarray,
-                                period: int = 12) -> float:
-        """
-        F4: Amplitude = (max_season - min_season) / mean(y)
-        Measures seasonal swing intensity with fallback for sparse data
-        
-        Args:
-            historical_data: Time series data
-            period: Seasonal period
-        
-        Returns:
-            Normalized amplitude
-        """
-        if len(historical_data) < 2 * period:
-            return np.nan
-        
-        try:
-            # STL decomposition
-            stl = STL(historical_data, seasonal=period + 1, robust=True)
-            result = stl.fit()
-            seasonal = result.seasonal
-            
-            # Get one full seasonal cycle (average across years)
-            n_cycles = len(seasonal) // period
-            seasonal_pattern = np.zeros(period)
-            for i in range(period):
-                seasonal_pattern[i] = np.mean([seasonal[j * period + i] 
-                                               for j in range(n_cycles) 
-                                               if j * period + i < len(seasonal)])
-            
-            max_season = seasonal_pattern.max()
-            min_season = seasonal_pattern.min()
-            mean_y = historical_data.mean()
-            
-            if mean_y < 0.01:
-                return np.nan
-            
-            amplitude = (max_season - min_season) / mean_y
-            return float(amplitude)
-        except:
-            # Fallback: Rolling window amplitude for sparse data
-            try:
-                if len(historical_data) >= period:
-                    # Calculate amplitude using rolling window
-                    amplitudes = []
-                    for i in range(len(historical_data) - period + 1):
-                        window = historical_data[i:i+period]
-                        amp = window.max() - window.min()
-                        amplitudes.append(amp)
-                    
-                    mean_amplitude = np.mean(amplitudes)
-                    mean_y = historical_data.mean()
-                    
-                    if mean_y < 0.01:
-                        return 0.0
-                    
-                    normalized_amp = mean_amplitude / mean_y
-                    return float(min(normalized_amp, 1.0))
-                
-                return 0.0
-            except:
-                return 0.0
+    # calculate_f4_amplitude는 compute_amplitude로 대체됨
     
     def calculate_f5_inflection(self,
                                  historical_data: np.ndarray,
@@ -384,7 +435,8 @@ class EWSScorer:
         f1 = self.calculate_f1_growth_ratio(forecast_values, historical_data)
         f2 = self.calculate_f2_confidence(mape, pi_lower, pi_upper)
         f3 = self.calculate_f3_seasonality(historical_data)
-        f4 = self.calculate_f4_amplitude(historical_data)
+        # compute_amplitude is the implemented method for F4 (amplitude)
+        f4 = self.compute_amplitude(historical_data)
         f5 = self.calculate_f5_inflection(historical_data)
         
         return {
@@ -642,54 +694,78 @@ def generate_ews_report(
     """
     # Initialize scorer
     scorer = EWSScorer()
-    
+
     # Load data
     df_forecast = pd.read_parquet(forecast_parquet_path)
     df_metadata = pd.read_csv(metadata_path)
-    
-    # Compute 5-factors for all series
+
+    # Compute 5-factors for all series, using latest month for forecast window
     all_factors = []
-    
+    candidate_details = []
+
     for series_id in df_forecast['series_id'].unique():
         # Load JSON
         safe_name = series_id.replace('/', '_').replace('|', '_').replace('\\', '_')
         json_path = Path(json_dir) / f"{safe_name}.json"
-        
+
         if not json_path.exists():
             continue
-        
+
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        
+
         df_hist = pd.DataFrame(data['data'])
-        df_train = df_hist[(df_hist['year'] >= 2021) & (df_hist['year'] <= 2023)]
-        historical_data = df_train['claim_count'].values
-        
-        if len(historical_data) < 24:
+        # Use all available data for historical
+        historical_data = df_hist['claim_count'].values
+
+        if len(historical_data) < 12:
             continue
-        
-        # Get forecast
-        series_forecast = df_forecast[df_forecast['series_id'] == series_id]
-        
-        # Support both 'forecast_value' and 'y_pred' column names
-        if 'forecast_value' in series_forecast.columns:
-            forecast_values = series_forecast['forecast_value'].values
-        elif 'y_pred' in series_forecast.columns:
-            forecast_values = series_forecast['y_pred'].values
+
+        # Get forecast for next 6 months from latest available month
+        # Find latest year/month in df_hist
+        latest_row = df_hist.sort_values(['year', 'month']).iloc[-1]
+        latest_year, latest_month = int(latest_row['year']), int(latest_row['month'])
+
+        # Filter forecast for next 6 months
+        series_forecast = df_forecast[df_forecast['series_id'] == series_id].copy()
+        # Support both 'year', 'month' columns
+        if 'year' in series_forecast.columns and 'month' in series_forecast.columns:
+            # Compute yyyymm for forecast
+            series_forecast['yyyymm'] = series_forecast['year'] * 100 + series_forecast['month']
+            start_yyyymm = latest_year * 100 + latest_month + 1
+            forecast_window = [((latest_year + (latest_month + i) // 12), ((latest_month + i) % 12) or 12) for i in range(1, 7)]
+            forecast_mask = series_forecast.apply(lambda r: (r['year'], r['month']) in forecast_window, axis=1)
+            if 'forecast_value' in series_forecast.columns:
+                forecast_values = series_forecast[forecast_mask]['forecast_value'].values
+            elif 'y_pred' in series_forecast.columns:
+                forecast_values = series_forecast[forecast_mask]['y_pred'].values
+            else:
+                forecast_values = np.zeros(6)
+            forecast_months = series_forecast[forecast_mask][['year', 'month']].values.tolist()
         else:
+            # Fallback: just take first 6 forecast values
+            if 'forecast_value' in series_forecast.columns:
+                forecast_values = series_forecast['forecast_value'].values[:6]
+            elif 'y_pred' in series_forecast.columns:
+                forecast_values = series_forecast['y_pred'].values[:6]
+            elif 'predicted_value' in series_forecast.columns:
+                forecast_values = series_forecast['predicted_value'].values[:6]
+            else:
+                forecast_values = np.zeros(6)
+            forecast_months = []
+
+        if len(forecast_values) < 6:
             continue
-        
-        # Get WMAPE from metadata (우리는 mape가 아니라 wmape 사용)
+
+        # Get WMAPE from metadata
         model_info = df_metadata[df_metadata['series_id'] == series_id]
-        
-        # Support both 'mape' and 'wmape' column names
         mape = None
         if len(model_info) > 0:
             if 'wmape' in model_info.columns:
                 mape = model_info.iloc[0]['wmape']
             elif 'mape' in model_info.columns:
                 mape = model_info.iloc[0]['mape']
-        
+
         # Compute factors
         factors = scorer.compute_5factors(
             series_id=series_id,
@@ -697,26 +773,33 @@ def generate_ews_report(
             historical_data=historical_data,
             mape=mape
         )
-        
+
+        # Attach forecast window info for candidates
+        factors['forecast_months'] = forecast_months
+        factors['forecast_values'] = forecast_values.tolist()
         all_factors.append(factors)
-    
+
     df_factors = pd.DataFrame(all_factors)
-    
+    # KeyError 방지: 'sparse_flag' 컬럼이 없거나 empty일 때 빈 결과 반환
+    output_cols = ['rank', 'series_id', 'ews_score', 'level', 'f1_ratio', 'f2_conf', 
+                   'f3_season', 'f4_ampl', 'f5_inflect', 'candidate', 'rationale']
+    if df_factors.empty or 'sparse_flag' not in df_factors.columns:
+        df_output = pd.DataFrame(columns=output_cols)
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        df_output.to_csv(output_path, index=False, encoding='utf-8-sig')
+        print(f"\n[SUCCESS] EWS report saved: {output_path}")
+        return df_output
     # Filter sparse series
     df_valid = df_factors[~df_factors['sparse_flag']].copy()
-    
     # Normalize factors for EWS calculation
     for fname in ['f1_ratio', 'f3_season', 'f4_ampl', 'f5_inflect']:
         if fname in df_valid.columns:
             scorer._normalize_factor(df_valid[fname].values, fname)
-    
     # Compute EWS scores
     df_valid['ews_score'] = df_valid.apply(lambda row: scorer.compute_ews_score(row.to_dict()), axis=1)
-    
     # Apply candidacy filters: S≥0.4 and A≥0.3
     df_valid['candidate'] = (df_valid['f3_season'] >= 0.4) & (df_valid['f4_ampl'] >= 0.3)
     df_valid['low_confidence'] = df_valid['f2_conf'] < 0.2
-    
     # Determine risk level
     def get_level(score, conf):
         if conf < 0.2:
@@ -727,9 +810,7 @@ def generate_ews_report(
             return 'MEDIUM'
         else:
             return 'LOW'
-    
     df_valid['level'] = df_valid.apply(lambda r: get_level(r['ews_score'], r['f2_conf']), axis=1)
-    
     # Generate rationale
     def make_rationale(row):
         parts = []
@@ -744,32 +825,31 @@ def generate_ews_report(
         if row['f2_conf'] < 0.2:
             parts.append(f"낮은신뢰도{row['f2_conf']:.2f}")
         return '; '.join(parts) if parts else 'normal'
-    
     df_valid['rationale'] = df_valid.apply(make_rationale, axis=1)
-    
-    # Sort by EWS score
-    df_valid = df_valid.sort_values('ews_score', ascending=False)
-    df_valid['rank'] = range(1, len(df_valid) + 1)
-    
+    # Only keep candidate series
+    df_candidates = df_valid[df_valid['candidate']].copy()
+    df_candidates = df_candidates.sort_values('ews_score', ascending=False)
+    df_candidates['rank'] = range(1, len(df_candidates) + 1)
     # Save
     output_cols = ['rank', 'series_id', 'ews_score', 'level', 'f1_ratio', 'f2_conf', 
-                   'f3_season', 'f4_ampl', 'f5_inflect', 'candidate', 'rationale']
-    df_output = df_valid[output_cols].copy()
-    
+                   'f3_season', 'f4_ampl', 'f5_inflect', 'candidate', 'rationale', 'forecast_months', 'forecast_values']
+    df_output = df_candidates[output_cols].copy()
+    if 'forecast_months' in df_output.columns:
+        df_output['forecast_months'] = df_output['forecast_months'].apply(json.dumps)
+    if 'forecast_values' in df_output.columns:
+        df_output['forecast_values'] = df_output['forecast_values'].apply(json.dumps)
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     df_output.to_csv(output_path, index=False, encoding='utf-8-sig')
-    
     print(f"\n{'='*80}")
-    print(f"EWS 5-FACTOR SCORING REPORT")
+    print(f"EWS 5-FACTOR SCORING REPORT (CANDIDATES ONLY)")
     print(f"{'='*80}")
     print(f"Total series processed: {len(df_factors)}")
     print(f"Sparse filtered: {df_factors['sparse_flag'].sum()}")
-    print(f"Valid candidates (S≥0.4, A≥0.3): {df_valid['candidate'].sum()}")
+    print(f"Valid candidates (S≥0.4, A≥0.3): {df_candidates['candidate'].sum()}")
     print(f"\nWeights: {scorer.weights}")
     print(f"\n{'='*80}")
     print(f"TOP {top_n} HIGH-RISK SERIES")
     print(f"{'='*80}")
-    
     for _, row in df_output.head(top_n).iterrows():
         print(f"\n[{int(row['rank'])}] {row['series_id']}")
         print(f"  EWS Score: {row['ews_score']:.3f} ({row['level']})")
@@ -779,9 +859,10 @@ def generate_ews_report(
         print(f"  F4(진폭): {row['f4_ampl']:.2f}")
         print(f"  F5(변곡): {row['f5_inflect']:.2f}")
         print(f"  근거: {row['rationale']}")
-    
+        if row['forecast_months']:
+            print(f"  예측월: {row['forecast_months']}")
+            print(f"  예측값: {row['forecast_values']}")
     print(f"\n[SUCCESS] EWS report saved: {output_path}")
-    
     return df_output
 
 

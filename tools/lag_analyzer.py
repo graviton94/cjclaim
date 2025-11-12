@@ -1,5 +1,5 @@
 """
-접수일-제조일 Lag 분석기 (제품범주2별)
+발생일자-제조일자 Lag 분석기 (제품범주2별)
 - 2021-2023 Base 데이터에서 lag 통계 산출
 - 월별 데이터 라벨링 (normal/borderline/extreme)
 - Retrain 후보 시리즈 추출
@@ -19,8 +19,8 @@ def calculate_lag_stats(df):
     Returns:
         DataFrame: product_cat2, mu, sigma, p90, p95, n, use_global
     """
-    # 접수일(발생일자) - 제조일 계산 (일 단위)
-    df['lag_days'] = (pd.to_datetime(df['접수일']) - pd.to_datetime(df['제조일자'])).dt.days
+    # 발생일자 - 제조일자 계산 (일 단위)
+    df['lag_days'] = (pd.to_datetime(df['발생일자']) - pd.to_datetime(df['제조일자'])).dt.days
     
     # 음수 lag 제거 (제조일자 > 발생일자 → 잘못 접수된 케이스)
     df_invalid_negative = df[df['lag_days'] < 0]
@@ -90,7 +90,7 @@ def label_and_filter(df, ref_stats):
         candidates_df: retrain 후보 (normal + borderline만)
     """
     # lag 계산 (발생일자 - 제조일자)
-    df['lag_days'] = (pd.to_datetime(df['접수일']) - pd.to_datetime(df['제조일자'])).dt.days
+    df['lag_days'] = (pd.to_datetime(df['발생일자']) - pd.to_datetime(df['제조일자'])).dt.days
     
     # 초기화: 모든 레코드 extreme으로 시작
     df['lag_class'] = 'extreme'
@@ -171,7 +171,7 @@ def main():
     args = parser.parse_args()
     
     print("=" * 80)
-    print("Lag Analyzer - 제품범주2별 접수-제조 lag 분석")
+    print("Lag Analyzer - 제품범주2별 발생일자-제조일자 lag 분석")
     print("=" * 80)
     
     # 입력 파일 읽기
@@ -215,16 +215,12 @@ def main():
         print(f"경고: 예상 컬럼 수({len(expected_cols)})보다 적습니다({len(df.columns)}).")
         print(f"현재 컬럼: {df.columns.tolist()}")
     
-    # 발생일자를 접수일로 사용
-    if '발생일자' in df.columns and '접수일' not in df.columns:
-        df['접수일'] = df['발생일자']
-    
     # count를 클레임건수로 사용
     if 'count' in df.columns and '클레임건수' not in df.columns:
         df['클레임건수'] = df['count']
-    
-    # 필수 컬럼 확인
-    required_cols = ['제조일자', '접수일', '제품범주2']
+
+    # 필수 컬럼 확인 (발생일자 사용)
+    required_cols = ['제조일자', '발생일자', '제품범주2']
     missing = [col for col in required_cols if col not in df.columns]
     if missing:
         print(f"\n현재 컬럼: {df.columns.tolist()}")

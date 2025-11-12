@@ -1,3 +1,4 @@
+__all__ = ["reconcile_month"]
 """
 Reconcile 모듈: 예측 보정 로직
 
@@ -426,3 +427,62 @@ def apply_reconciliation(y_pred: Union[np.ndarray, pd.Series],
             print(f"  ⚠️  계절성 재보정 실패: {e}")
     
     return y_adjusted, metadata
+
+
+def reconcile_month(forecast_parquet: str, train_parquet: str, out_parquet: str) -> dict:
+    """
+    S6: 월별 예측 결과 보정 및 저장
+    Args:
+        forecast_parquet: 예측 결과 parquet 경로
+        train_parquet: 학습/실측 데이터 parquet 경로
+        out_parquet: 보정 결과 저장 경로
+    Returns:
+        {"reconciled": out_parquet, "series_count": int}
+    """
+    import pandas as pd
+    from pathlib import Path
+    Path(out_parquet).parent.mkdir(parents=True, exist_ok=True)
+    # 1) 예측 결과 로드
+    fc = pd.read_parquet(forecast_parquet)
+    # 2) 실측 데이터 로드 (파일 없으면 빈 DataFrame)
+    import os
+    if not os.path.exists(train_parquet):
+        tr = pd.DataFrame(columns=["series_id","y","count","발생건수"])
+    else:
+        tr = pd.read_parquet(train_parquet)
+    # 3) series_id 기준 그룹화 및 보정 (월별 기준)
+    rows = []
+    for sid, g in fc.groupby("series_id", sort=False):
+        # 실측 데이터 매칭
+        g_tr = tr[tr["series_id"] == sid]
+        y_pred = g["predicted_value"].values
+        # value 컬럼 우선순위: y > count > 발생건수
+        if "y" in g_tr.columns:
+            y_train = g_tr["y"].values
+        elif "count" in g_tr.columns:
+            y_train = g_tr["count"].values
+        elif "발생건수" in g_tr.columns:
+            y_train = g_tr["발생건수"].values
+        else:
+            y_train = None
+        month_info = g["forecast_month"].values if "forecast_month" in g.columns else None
+        # 보정 적용
+        if y_train is not None and len(y_train) > 0:
+            y_adj, meta = apply_reconciliation(y_pred, y_train, None, month_info)
+        else:
+            y_adj, meta = y_pred, {}
+        for i, row in g.iterrows():
+            rows.append({
+                "series_id": sid,
+                "forecast_month": row["forecast_month"] if "forecast_month" in row else None,
+                "predicted_value": float(max(0.0, y_adj[i - g.index[0]] if i - g.index[0] < len(y_adj) else 0.0)),
+                "lower_bound": float(max(0.0, row["lower_bound"])),
+                "upper_bound": float(max(0.0, row["upper_bound"])),
+            })
+    out_df = pd.DataFrame(rows)
+    out_df.to_parquet(out_parquet, index=False)
+    if "series_id" in out_df.columns:
+        series_count = int(out_df["series_id"].nunique())
+    else:
+        series_count = 0
+    return {"reconciled": out_parquet, "series_count": series_count}
